@@ -69,7 +69,6 @@ RUN git clone https://github.com/RLoad/cFunc.git
 RUN git clone -b master https://github.com/nbfigueroa/lagsDS-lib.git
 RUN wstool init
 RUN wstool merge lagsDS-lib/dependencies.rosinstall 
-RUN git clone https://github.com/RLoad/box_spawner.git
 
 RUN git clone https://github.com/RLoad/DS_Robetarme.git
 RUN cp -r DS_Robetarme/ds_motion_robetarme .
