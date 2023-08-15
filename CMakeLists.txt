@@ -124,10 +124,10 @@ target_link_libraries(ds_robetarme ${catkin_LIBRARIES})
 
 
 add_executable(linearDS_node src/linearDS_node.cpp)
-target_link_libraries(linearDS_node ds_robetarme online_ESN cFunc boost_system boost_serialization boost_filesystem)
+target_link_libraries(linearDS_node ds_robetarme cFunc boost_system boost_serialization boost_filesystem)
 
 add_executable(coupledDS_node src/coupledDS_node.cpp)
-target_link_libraries(coupledDS_node ds_robetarme online_ESN cFunc boost_system boost_serialization boost_filesystem utils)
+target_link_libraries(coupledDS_node ds_robetarme cFunc boost_system boost_serialization boost_filesystem utils)
 
 ### ADD Nodes that use the library
 
