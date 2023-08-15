@@ -88,7 +88,7 @@ find_package(catkin REQUIRED COMPONENTS
 ## CATKIN_DEPENDS: catkin_packages dependent projects also need
 ## DEPENDS: system dependencies of this project that dependent projects also need
 catkin_package(
- INCLUDE_DIRS include/coupled_DS include/learned_DS
+ INCLUDE_DIRS include/coupled_DS 
  LIBRARIES ds_robetarme
  CATKIN_DEPENDS roscpp rospy std_msgs nav_msgs mathlib sgaussians lpvDS lagsDS dynamic_reconfigure cFunc utils
 )
@@ -107,7 +107,7 @@ set(H_FILES
 
 ## Specify locations of header files
 ## Your package locations should be listed before other locations
-include_directories(include/coupled_DS include/learned_DS ${catkin_INCLUDE_DIRS})
+include_directories(include/coupled_DS ${catkin_INCLUDE_DIRS})
 include_directories(${dynamic_reconfigure_PACKAGE_PATH}/cmake/cfgbuild.cmake)
 
 ## Declare a C++ executable
@@ -124,10 +124,10 @@ target_link_libraries(ds_robetarme ${catkin_LIBRARIES})
 
 
 add_executable(linearDS_node src/linearDS_node.cpp)
-target_link_libraries(linearDS_node ds_robetarme online_ESN cFunc limbo boost_system boost_serialization boost_filesystem)
+target_link_libraries(linearDS_node ds_robetarme online_ESN cFunc boost_system boost_serialization boost_filesystem)
 
 add_executable(coupledDS_node src/coupledDS_node.cpp)
-target_link_libraries(coupledDS_node ds_robetarme online_ESN cFunc limbo boost_system boost_serialization boost_filesystem utils)
+target_link_libraries(coupledDS_node ds_robetarme online_ESN cFunc boost_system boost_serialization boost_filesystem utils)
 
 ### ADD Nodes that use the library
 
