@@ -21,12 +21,12 @@
     <param name="record_1_robotdemo_0_humandemo"    value="false"/>#----!!!!!! true  remember change name and the tool offset when change experiment!!!!
 
     #--- load DS and GMM model
-    <rosparam command="load" file="$(find ds_robetarme)/ds_motion_robetarme/config/test/$(arg target_name).yml"/>
+    <rosparam command="load" file="$(find ds_robetarme)/config/test/$(arg target_name).yml"/>
 
     #---- save file folder name
     <arg name="save_folder_name"       default="go_home_or_test_position_control"/>  
-    <!-- <param name="recording_path" value="$(find ds_robetarme)/ds_motion_robetarme/Recordings/demo_record/$(arg save_folder_name)/"/> -->
-    <param name="recording_path" value="$(find ds_robetarme)/ds_motion_robetarme/Recordings/robot_exp/$(arg save_folder_name)/"/>
+    <!-- <param name="recording_path" value="$(find ds_robetarme)/Recordings/demo_record/$(arg save_folder_name)/"/> -->
+    <param name="recording_path" value="$(find ds_robetarme)/Recordings/robot_exp/$(arg save_folder_name)/"/>
 
     #---- name the node
     <node name="linearDS_node" pkg="ds_robetarme"  type="linearDS_node" output="screen"/>
