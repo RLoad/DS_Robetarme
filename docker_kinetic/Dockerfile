@@ -71,6 +71,8 @@ RUN wstool init
 RUN wstool merge lagsDS-lib/dependencies.rosinstall 
 
 RUN git clone https://github.com/RLoad/DS_Robetarme.git
+RUN cp -r DS_Robetarme/ds_motion_robetarme .
+RUN rm DS_Robetarme -r
 
 RUN rosdep install --from-paths . --ignore-src --rosdistro kinetic 
 WORKDIR $CATKIN_WS
