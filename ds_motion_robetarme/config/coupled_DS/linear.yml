@@ -1,0 +1,10 @@
+# #--- home position
+# target: [ 0.9, -0.0, 0.5, 0.0, 0.7, 0.0, 0.7]
+
+# #--- good for linearDS+circleDS
+target: [0.8, -0.0, 0.8, 0.0, 0.7, 0.0, 0.7]
+
+#--- test for 1/4circleDS+circleDS
+# target: [ 0.80, 0.0, 0.3, 0.0, 0.707, 0.0, 0.707] #--- in sim
+# target: [ 0.65, 0.0, 0.8, 0.0000, 0.0000, 0.0000, 1.0000] #--- in sim rotate with X
+# target: [0.55, 0.0, 0.35, 0.0000, 0.9848, 0.0000, 0.1736] #--- in sim test tool offset
