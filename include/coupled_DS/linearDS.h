@@ -33,10 +33,9 @@
 #include <sensor_msgs/JointState.h>
 
 //---- eigen and vector
-#include "Eigen/Eigen"
-#include <Eigen/Dense>
-#include <Eigen/Geometry>
-#include <Eigen/Core>
+#include <eigen3/Eigen/Dense>
+#include <eigen3/Eigen/Geometry>
+#include <eigen3/Eigen/Core>
 
 #include <vector>
 #include <mutex>
