@@ -1,5 +1,5 @@
 #!/bin/bash
-IMAGE_NAME="epfl-lasa/iiwa_robetarme_kinetic"
+IMAGE_NAME="epfl-lasa/iiwa_robetarme_ds"
 CONTAINER_NAME="${IMAGE_NAME//[\/.]/-}"
 USERNAME="ros"
 MODE=()
@@ -94,14 +94,14 @@ if [ "${MODE}" != "connect" ]; then
        	
     # add volume
        
-    docker volume rm ds_motion_generator-1
+    docker volume rm ds_motion_robetarme
     docker volume create --driver local \
     --opt type="none" \
-    --opt device="${PWD}/../../ds_motion_generator-1" \
+    --opt device="${PWD}/../ds_motion_robetarme" \
     --opt o="bind" \
-    "ds_motion_generator-1"
+    "ds_motion_robetarme"
     
-    FWD_ARGS+=(--volume="ds_motion_generator-1:/home/ros/catkin_ws/src/ds_motion_generator-1:rw")
+    FWD_ARGS+=(--volume="ds_motion_robetarme:/home/ros/catkin_ws/src/ds_motion_robetarme:rw")
 
 
     # Setup git config

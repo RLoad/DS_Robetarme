@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Name and base and options
-IMAGE_NAME=epfl-lasa/iiwa_robetarme_kinetic                           # Chose any name for your image (but make sure to report it in start_docker)
+IMAGE_NAME=epfl-lasa/iiwa_robetarme_ds                          # Chose any name for your image (but make sure to report it in start_docker)
 ROS_DISTRO=kinetic                                         # Possible: noetic, melodic
 USE_SIMD=OFF                                              # Possible: ON, OFF
 BASE_IMAGE=ros:kinetic    # Do not modify
