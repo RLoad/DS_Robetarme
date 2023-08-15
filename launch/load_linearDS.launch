@@ -1,0 +1,44 @@
+<?xml version="1.0" ?>
+<launch>
+
+#---- yaml set taget
+ <arg name="target_name"       default="linear"/>
+
+<group ns="test">
+    #---- input output
+    <param name="input_pose_name"                   value="/iiwa/ee_info/Pose"/>
+    <param name="input_velocity_name"                   value="/iiwa/ee_info/Vel"/>
+    <!-- <param name="input_force_name"                  value="/ft_sensor/netft_data"/> -->
+    <param name="input_force_name"                  value="/iiwa/iiwa_FTS_topic"/>
+    
+    <param name="output_velocity_name"                 value="/ds1/desired_velocity"/>
+    <param name="output_filtered_velocity_name"        value="/passive_control/vel_quat"/>
+    <param name="output_damping_eig_topic_name"        value="/lwr/joint_controllers/passive_ds_eig"/>
+    <param name="output_position_name"                 value="/iiwa/PositionController/command"/>
+    
+    #---- control parameter
+    <param name="record_or_not"                     value="true"/>
+    <param name="record_1_robotdemo_0_humandemo"    value="false"/>#----!!!!!! true  remember change name and the tool offset when change experiment!!!!
+
+    #--- load DS and GMM model
+    <rosparam command="load" file="$(find ds_motion_generator)/config/test/$(arg target_name).yml"/>
+
+    #---- save file folder name
+    <arg name="save_folder_name"       default="go_home_or_test_position_control"/>  
+    <!-- <param name="recording_path" value="$(find ds_motion_generator)/Recordings/demo_record/$(arg save_folder_name)/"/> -->
+    <param name="recording_path" value="$(find ds_motion_generator)/Recordings/robot_exp/$(arg save_folder_name)/"/>
+
+    #---- name the node
+    <node name="linearDS_node" pkg="ds_robetarme"  type="linearDS_node" output="screen"/>
+</group>
+
+<!-- <group ns="plot">
+
+  <node name="parm_plot2"
+          pkg="rqt_plot"
+          type="rqt_plot"
+          args="/wr/force_error/linear/x:y:z" />
+
+</group> -->
+
+</launch>
