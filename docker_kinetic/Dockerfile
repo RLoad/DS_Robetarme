@@ -59,7 +59,7 @@ RUN mkdir -p $CATKIN_SRC && chown -R ros:ros $CATKIN_WS
 WORKDIR $CATKIN_SRC
 
 #install rospackage from github
-RUN git clone -b master https://github.com/RLoad/net-ft-ros.git
+RUN git clone -b master https://github.com/epfl-lasa/net-ft-ros.git
 RUN git clone -b nadia https://github.com/nbfigueroa/lpvDS-lib.git
 RUN git clone -b master https://github.com/epfl-lasa/gaussian-process-regression.git
 RUN git clone https://github.com/epfl-lasa/mathlib.git
