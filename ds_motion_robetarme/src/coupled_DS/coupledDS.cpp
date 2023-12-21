@@ -448,7 +448,7 @@ void coupledDS::ComputeCommand() {
 
 		}else if (phase==2)//---- do a circle
 		{
-			int use_circle_DS_with_linearDS=2;//--- 1: linearDS+circleDS, 2, 1/4 cricleDS+circleDS
+			int use_circle_DS_with_linearDS=1;//--- 1: linearDS+circleDS, 2, 1/4 cricleDS+circleDS
 			if (use_circle_DS_with_linearDS==1)//--- use circleDS + linearDS
 			{//--- find out that the circle not accurate is because damping controller is not good, use passiveDS get good result...
 

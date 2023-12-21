@@ -2,8 +2,8 @@
 # target: [ 0.9, -0.0, 0.5, 0.0, 0.7, 0.0, 0.7]
 
 # #--- good for linearDS+circleDS
-target: [0.8, -0.0, 0.8, 0.0, 0.7, 0.0, 0.7]
-
+#target: [0.6, -0.4, 0.3, -0.479475, 0.516530, -0.498446,0.504829] #px,py,pz,qx,qy,qz,qw
+target: [0.5, -0.0, 0.6, -0.5, 0.5, -0.5,0.5] #px,py,pz,qx,qy,qz,qw
 #--- test for 1/4circleDS+circleDS
 # target: [ 0.80, 0.0, 0.3, 0.0, 0.707, 0.0, 0.707] #--- in sim
 # target: [ 0.65, 0.0, 0.8, 0.0000, 0.0000, 0.0000, 1.0000] #--- in sim rotate with X

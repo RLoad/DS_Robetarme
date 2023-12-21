@@ -28,7 +28,7 @@ int main(int argc, char **argv)
   ros::init(argc, argv, "linearDS_node");
 
   ros::NodeHandle nh;
-  double frequency = 100.0;
+  double frequency = 1000.0;
 
   //--- Parameters in launch
     std::string input_pose_name;

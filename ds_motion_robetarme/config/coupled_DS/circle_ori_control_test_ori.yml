@@ -1,8 +1,8 @@
 # #--- good for linearDS+circleDS (sim)
-# target: [ 0.8, -0.0, 0.8, 0.0, 0.6, 0.0, 0.5] #--- in sim
-# Convergence_Rate: 40.0
-# Cycle_radius: 0.01
-# Cycle_speed: 12.0
+target: [ -0.2 ,-0.0, 0.6, 0.0, -0.7, 0, 0.7] #--- in sim
+Convergence_Rate: 40.0
+Cycle_radius: 0.1
+Cycle_speed: 6.0
 
 # #--- good for linearDS+circleDS (real)
 # target: [ 0.8, -0.0, 0.8, 0.0, 0.6, 0.0, 0.5] #--- in sim
@@ -15,7 +15,7 @@
 # # target: [ 0.85, 0.0, 0.5, 0.0000, 0.6078, 0.3039, 0.7337] #--- test quaternion
 # # target: [ 0.85, 0.0, 0.5, 0.0000, 0.6078, -0.3039, 0.7337] #--- test quaternion
 # target: [ 0.65, 0.0, 0.8, 0.4472, 0.4472, 0.0000, 0.7746] #--- test quaternion
-target: [ 0.65, 0, 0.8, 0.2588, 0.0000, 0.0000, 0.9659] #--- in sim rotate with X
-Convergence_Rate: 10.0
-Cycle_radius: 0.0
-Cycle_speed: -1.0
+#target: [ 0.45, 0, 0.6, 0.2588, 0.0000, 0.0000, 0.9659] #--- in sim rotate with X
+#Convergence_Rate: 10.0
+#Cycle_radius: 0.0
+#Cycle_speed: -1.0
