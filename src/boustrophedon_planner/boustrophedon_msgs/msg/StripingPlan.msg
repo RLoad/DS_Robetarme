@@ -1,0 +1,2 @@
+Header header
+StripingPoint[] points

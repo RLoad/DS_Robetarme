@@ -1,7 +1,7 @@
 # #--- good for linearDS+circleDS (sim)
 target: [ -0.3 ,-0.0, 0.6, 0.0, -0.7, 0, 0.7] #--- in sim
 Convergence_Rate: 8.0
-Cycle_radius: 0.01
+Cycle_radius: 0.05
 Cycle_speed: 12.0
 
 # #--- good for linearDS+circleDS (real)

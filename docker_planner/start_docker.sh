@@ -1,5 +1,5 @@
 #!/bin/bash
-IMAGE_NAME="epfl-lasa/iiwa_robetarme_ds"
+IMAGE_NAME="epfl-lasa/planner_robetarme"
 CONTAINER_NAME="${IMAGE_NAME//[\/.]/-}"
 USERNAME="ros"
 MODE=()
@@ -90,18 +90,42 @@ if [ "${MODE}" != "connect" ]; then
 
     # Other
     FWD_ARGS+=("--privileged")
-    
-       	
-    # add volume
-       
-    docker volume rm ds_motion_robetarme
+
+
+
+    # Add volume boustrophedon_msgs/
+    docker volume rm boustrophedon_msgs
     docker volume create --driver local \
     --opt type="none" \
-    --opt device="${PWD}/../src/ds_motion_robetarme" \
-    --opt o="bind" \
-    "ds_motion_robetarme"
+    --opt device="${PWD}/../src/boustrophedon_planner/boustrophedon_msgs" \
+    --opt o="bind"  \
+    "boustrophedon_msgs"
+
+    FWD_ARGS+=(--volume="boustrophedon_msgs:/home/ros/ros_ws/src/boustrophedon_msgs:rw")
     
-    FWD_ARGS+=(--volume="ds_motion_robetarme:/home/ros/catkin_ws/src/ds_motion_robetarme:rw")
+    # Add volume boustrophedon_server/
+    docker volume rm boustrophedon_server
+    docker volume create --driver local \
+    --opt type="none" \
+    --opt device="${PWD}/../src/boustrophedon_planner/boustrophedon_server" \
+    --opt o="bind"  \
+    "boustrophedon_server"
+
+    FWD_ARGS+=(--volume="boustrophedon_server:/home/ros/ros_ws/src/boustrophedon_server:rw")
+
+    #Add volume test_boustrophedon_with_robot/
+    docker volume rm test_boustrophedon_with_robot
+   
+    docker volume create --driver local \
+    --opt type="none" \
+    --opt device="${PWD}/../src/test_boustrophedon_with_robot" \
+    --opt o="bind" \
+    "test_boustrophedon_with_robot"
+
+    FWD_ARGS+=(--volume="test_boustrophedon_with_robot:/home/ros/ros_ws/src/test_boustrophedon_with_robot:rw")
+    
+
+   
 
     # Setup git config
     FWD_ARGS+=(--volume="${HOME}/.gitconfig:/home/ros/.gitconfig:ro")
