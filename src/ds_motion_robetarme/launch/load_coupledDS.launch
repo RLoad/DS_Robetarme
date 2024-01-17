@@ -2,14 +2,15 @@
 <launch>
 
 #---- yaml set taget
- <arg name="target_name"       default="circle_ori_control_test_ori"/>
+<arg name="target_name"       default="circle_ori_control_test_ori"/>
+<arg name="robot"             default="ur5"/>
 
 <group ns="test">
     #---- input output
-    <param name="input_pose_name"                   value="/iiwa/ee_info/Pose"/>
-    <param name="input_velocity_name"                   value="/iiwa/ee_info/Vel"/>
+    <param name="input_pose_name"                   value="$(arg robot)/ee_info/Pose"/>
+    <param name="input_vel_name"                    value="$(arg robot)/ee_info/Vel"/>
     <!-- <param name="input_force_name"                  value="/ft_sensor/netft_data"/> -->
-    <param name="input_force_name"                  value="/iiwa/iiwa_FTS_topic"/>
+    <param name="input_force_name"                  value="$(arg robot)/iiwa_FTS_topic"/>
     
     <param name="output_velocity_name"                 value="/ds1/desired_velocity"/>
     <param name="output_filtered_velocity_name"        value="/passive_control/vel_quat"/>
