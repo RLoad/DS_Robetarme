@@ -54,7 +54,7 @@ RUN sudo apt update && sudo apt install -y \
     ros-${ROS_DISTRO}-rosparam-shortcuts \
     && sudo apt upgrade -y && sudo apt clean
 
-RUN sudo apt-get install libcgal-dev
+RUN sudo apt-get install libcgal-dev -y
 FROM ros-ws as inverse-kinematics
 
 

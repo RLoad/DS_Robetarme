@@ -4,6 +4,7 @@
 #---- yaml set taget
 <arg name="target_name"       default="linear"/>
 <arg name="robot"             default="ur5"/>
+<param name="robot"           value="$(arg robot)"/>
 
 <group ns="test">
     #---- input output

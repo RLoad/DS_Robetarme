@@ -47,6 +47,15 @@ target_link_libraries(boustrophedon_planner_server
   CGAL::CGAL_Core)
 add_dependencies(boustrophedon_planner_server ${catkin_EXPORTED_TARGETS})
 
+add_executable(boustrophedon_planner_client
+  src/boustrophedon_server/boustrophedon_planner_client_node.cpp
+  )
+target_link_libraries(boustrophedon_planner_client
+  ${catkin_LIBRARIES}
+  CGAL::CGAL
+  CGAL::CGAL_Core)
+add_dependencies(boustrophedon_planner_client ${catkin_EXPORTED_TARGETS})
+
 install(
   TARGETS
   boustrophedon_planner_server

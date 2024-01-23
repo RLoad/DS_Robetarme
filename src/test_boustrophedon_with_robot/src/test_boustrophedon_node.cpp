@@ -46,7 +46,6 @@ geometry_msgs::Pose  msg_desired_vel_filtered_;
 
 std::size_t i_follow = 0;
 
-
 //----------------define all function-------------------------------------
 // server has a service to convert StripingPlan to Path, but all it does it call this method
 bool convertStripingPlanToPath(const boustrophedon_msgs::StripingPlan& striping_plan, nav_msgs::Path& path)
@@ -106,15 +105,11 @@ Eigen::Vector3f calaulteVelocityCommand(const boustrophedon_msgs::StripingPlan& 
   Eigen::Vector3f d_vel_;
   Eigen::Vector3f path_point;
 
-  
-
-  
-
   if (i_follow < striping_plan.points.size() - 1)
   {
     path_point(0)=striping_plan.points[i_follow + 1].point.x;
     path_point(1)=striping_plan.points[i_follow + 1].point.y;
-    path_point(2)=0.9;
+    path_point(2)=0.6;
 
     // Eigen::Vector4f target_ori=1;
     // Eigen::Matrix3f pathRotMat=ori2rotmat;
@@ -137,7 +132,7 @@ Eigen::Vector3f calaulteVelocityCommand(const boustrophedon_msgs::StripingPlan& 
   {
     path_point(0)=striping_plan.points[i_follow].point.x;
     path_point(1)=striping_plan.points[i_follow].point.y;
-    path_point(2)=0.9;
+    path_point(2)=0.6;
 
     dx = path_point(2) - real_pose_(0);
     dy = path_point(1) - real_pose_(1);
@@ -183,7 +178,7 @@ void UpdateRealPosition(const geometry_msgs::Pose::ConstPtr& msg) {
 	real_pose_ori_(2) = msg_real_pose_.orientation.z;
 	real_pose_ori_(3) = msg_real_pose_.orientation.w;
 
-	//---- Update end effecotr pose (position+orientation)
+	//---- Update end effector pose (position+orientation)
 	_x << msg_real_pose_.position.x, msg_real_pose_.position.y, msg_real_pose_.position.z;
 	_q << msg_real_pose_.orientation.w, msg_real_pose_.orientation.x, msg_real_pose_.orientation.y, msg_real_pose_.orientation.z;
 	_wRb = quaternionToRotationMatrix(_q);
@@ -220,9 +215,16 @@ int main(int argc, char** argv)
     ros::Publisher start_pub = n.advertise<geometry_msgs::PoseStamped>("/start_pose", 1, true);
     ros::Subscriber init_pose =
         n.subscribe<geometry_msgs::PoseWithCovarianceStamped>("/initialpose", 1, initialPoseCallback);
-    
+     // Define the parameter name
+    std::string param_name = "robot";
+
+    // Declare a variable to store the parameter value
+    std::string robot_name;
+
+  // Try to get the parameter value
+    n.getParam(param_name, robot_name);
     ros::Subscriber sub_real_pose_= 
-        n.subscribe( "/iiwa/ee_info/Pose" , 1000, &UpdateRealPosition, ros::TransportHints().reliable().tcpNoDelay());
+        n.subscribe( robot_name + "/ee_info/Pose" , 1000, &UpdateRealPosition, ros::TransportHints().reliable().tcpNoDelay());
     // ros::Publisher pub_desired_vel_ = 
     //     n.advertise<geometry_msgs::Twist>("/passive_control/vel_quat", 1);   
     ros::Publisher pub_desired_vel_filtered_ = 
@@ -241,16 +243,18 @@ int main(int argc, char** argv)
     goal.property.header.stamp = ros::Time::now();
     goal.property.header.frame_id = "map";
 
-    double target_length=0.2;
+    double target_length=-0.4;
+    double target_height=0.6;
+
 
     goal.property.polygon.points.resize(4);
-    goal.property.polygon.points[0].x = 0+0.5;
+    goal.property.polygon.points[0].x = 0+target_height;
     goal.property.polygon.points[0].y = 0+0.0;
-    goal.property.polygon.points[1].x = 0+0.5;
+    goal.property.polygon.points[1].x = 0+target_height;
     goal.property.polygon.points[1].y = target_length+0.0;
-    goal.property.polygon.points[2].x = target_length+0.5;
+    goal.property.polygon.points[2].x = target_length+target_height;
     goal.property.polygon.points[2].y = target_length+0.0;
-    goal.property.polygon.points[3].x = target_length+0.5;
+    goal.property.polygon.points[3].x = target_length+target_height;
     goal.property.polygon.points[3].y = 0+0.0;
 
     goal.property.polygon.points[0].z = 0.1;

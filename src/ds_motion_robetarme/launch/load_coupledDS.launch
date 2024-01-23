@@ -4,6 +4,7 @@
 #---- yaml set taget
 <arg name="target_name"       default="circle_ori_control_test_ori"/>
 <arg name="robot"             default="ur5"/>
+<param name="robot"           value="$(arg robot)"/>
 
 <group ns="test">
     #---- input output

@@ -2,20 +2,21 @@
 <launch>
 
 #---- yaml set taget
-<arg name="target_name"       default="linear"/>
-<arg name="robot"             default="ur5"/>
+ <arg name="target_name"       default="linear"/>
+ <arg name="robot" default="ur5"/>
+ <param name="robot" value="$(arg robot)"/>
 <group ns="test">
     #---- input output
-    <param name="input_pose_name"                   value="$(arg robot)/ee_info/Pose"/>
-    <param name="input_vel_name"                   value="$(arg robot)/ee_info/Vel"/>
+    <param name="input_pose_name"                   value="/(arg robot)/ee_info/Pose"/>
+    <param name="input_vel_name"                   value="/(arg robot)/ee_info/Vel"/>
     <!-- <param name="input_force_name"                  value="/ft_sensor/netft_data"/> -->
-    <param name="input_force_name"                  value="$(arg robot)/iiwa_FTS_topic"/>
-    <param name="input_joint_state_name"                  value="/iiwa/joint_states"/>
+    <param name="input_force_name"                  value="/(arg robot)/iiwa_FTS_topic"/>
+    <param name="input_joint_state_name"                  value="/(arg robot)/joint_states"/>
     
     <param name="output_vel_name"                 value="/ds1/desired_velocity"/>
     <param name="output_filtered_vel_name"        value="/passive_control/vel_quat"/>
     <param name="output_damping_eig_topic_name"        value="/lwr/joint_controllers/passive_ds_eig"/>
-    <param name="output_joint_position_name"        value="$(arg robot)/PositionController/command"/>
+    <param name="output_joint_position_name"        value="/(arg robot)/PositionController/command"/>
 
     #---- control parameter
     <param name="record_or_not"                     value="true"/>
