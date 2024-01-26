@@ -295,14 +295,14 @@ Eigen::Vector3f calaulteVelocityCommand(nav_msgs::Path& path_transf, Eigen::Vect
     d_vel_(2)=dz;
   }
 
-  std::cerr<<"i_follow: "<<i_follow << std::endl;
-  std::cerr<<"real_pose_: "<< real_pose_(0) <<","<< real_pose_(1) <<","<< real_pose_(2) <<"," << std::endl;
-  std::cerr<<"striping_plan: "<< path_transf.poses[i_follow + 1].pose.position.x<<","
-                              << path_transf.poses[i_follow + 1].pose.position.y <<","
-                              << path_transf.poses[i_follow + 1].pose.position.z<<"," << std::endl;
-  std::cerr<<"vel dx: "<< dx <<","<< dy <<","<< dz <<"," << std::endl;
-  std::cerr<<"d_vel_: "<< d_vel_(0) <<","<< d_vel_(1) <<","<< d_vel_(2) <<"," << std::endl;
-  std::cerr<<"d_vel_.norm(): "<<d_vel_.norm() << std::endl;
+  // std::cerr<<"i_follow: "<<i_follow << std::endl;
+  // std::cerr<<"real_pose_: "<< real_pose_(0) <<","<< real_pose_(1) <<","<< real_pose_(2) <<"," << std::endl;
+  // std::cerr<<"striping_plan: "<< path_transf.poses[i_follow + 1].pose.position.x<<","
+  //                             << path_transf.poses[i_follow + 1].pose.position.y <<","
+  //                             << path_transf.poses[i_follow + 1].pose.position.z<<"," << std::endl;
+  // std::cerr<<"vel dx: "<< dx <<","<< dy <<","<< dz <<"," << std::endl;
+  // std::cerr<<"d_vel_: "<< d_vel_(0) <<","<< d_vel_(1) <<","<< d_vel_(2) <<"," << std::endl;
+  // std::cerr<<"d_vel_.norm(): "<<d_vel_.norm() << std::endl;
 
   return d_vel_;
 }
