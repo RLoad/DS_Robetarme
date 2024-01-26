@@ -414,7 +414,6 @@ int main(int argc, char** argv)
       bool finished_before_timeout = client.waitForResult(ros::Duration(30.0));
       actionlib::SimpleClientGoalState state = client.getState();
       boustrophedon_msgs::PlanMowingPathResultConstPtr result = client.getResult();
-      std::cout << result->plan.points.size()<< std::endl;
       if (result->plan.points.size() < 1)
       {
         ROS_INFO("Action did not finish before the time out.");
@@ -441,12 +440,12 @@ int main(int argc, char** argv)
 
       ros::Time end_time = ros::Time::now();
       ros::Duration elapsed_time = end_time - start_time;
-      ROS_INFO_STREAM("Time elapsed: " << elapsed_time.toSec() << " seconds");
+      //ROS_INFO_STREAM("Time elapsed: " << elapsed_time.toSec() << " seconds");
 
       // ROS_INFO_STREAM("real_pose_: " << real_pose_ );
       
       desired_vel_filtered_=calaulteVelocityCommand(path_transformed, real_pose_);
-      ROS_INFO_STREAM("desired_vel_filtered_: " << desired_vel_filtered_ );
+      //ROS_INFO_STREAM("desired_vel_filtered_: " << desired_vel_filtered_ );
       msg_desired_vel_filtered_.position.x  = desired_vel_filtered_(0);
       msg_desired_vel_filtered_.position.y  = desired_vel_filtered_(1);
       msg_desired_vel_filtered_.position.z  = desired_vel_filtered_(2);

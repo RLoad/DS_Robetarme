@@ -1,0 +1,7 @@
+<launch>
+    <!-- Launch the first launch file -->
+    <include file="$(find test_boustrophedon_with_robot)/launch/path_planning_wo_server.launch" />
+
+    <!-- Launch the second launch file -->
+    <include file="$(find boustrophedon_server)/launch/boustrophedon_server.launch" />
+</launch>
