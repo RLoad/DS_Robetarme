@@ -1,33 +1,56 @@
+import matplotlib.pyplot as plt
 import numpy as np
+from scipy.spatial.transform import Rotation
+from mpl_toolkits.mplot3d import Axes3D
 
-# Points initiaux du chemin sur la planche (dans le plan XY)
-points_initial = np.array([[x1, y1],
-                           [x2, y2],
-                           [x3, y3],
-                           [x4, y4]])
+def quaternion_to_rotation_matrix(quaternion):
+    # Convert quaternion to rotation matrix
+    r = Rotation.from_quat(quaternion)
+    return r.as_matrix()
 
-# Position et orientation initiales de la planche dans l'espace
-initial_position = np.array([initial_x, initial_y, initial_z])
-initial_orientation_quaternion = np.array([initial_qw, initial_qx, initial_qy, initial_qz])
+def create_rectangle_points(x_obj, y_obj, quaternion, width=64, height=49):
+    # Convert quaternion to rotation matrix
+    rotation_matrix = quaternion_to_rotation_matrix(quaternion)
 
-# Nouvelle position et orientation de la planche dans l'espace
-new_position = np.array([new_x, new_y, new_z])
-new_orientation_quaternion = np.array([new_qw, new_qx, new_qy, new_qz])
+    # Calculate local coordinates of rectangle corners
+    local_points = np.array([
+        [-width/2, -height/2, 0],
+        [width/2, -height/2, 0],
+        [width/2, height/2, 0],
+        [-width/2, height/2, 0]
+    ])
 
-# Calculer la transformation homogène pour le déplacement
-translation_matrix = np.eye(4)
-translation_matrix[:3, 3] = new_position - initial_position
+    # Transform to global coordinates
+    global_points = np.dot(local_points, rotation_matrix.T) + np.array([x_obj, y_obj, 0])
 
-rotation_matrix = np.eye(4)
-rotation_matrix[:3, :3] = np.dot(
-    np.dot(tf.transformations.quaternion_matrix(initial_orientation_quaternion)[:3, :3],
-           tf.transformations.quaternion_matrix(new_orientation_quaternion)[:3, :3]),
-    rotation_matrix[:3, :3]
-)
+    return global_points
 
-transformation_matrix = np.dot(translation_matrix, rotation_matrix)
+def plot_3d_rectangle(global_points):
+    # Plotting in 3D
+    fig = plt.figure()
+    ax = fig.add_subplot(111, projection='3d')
+    
+    # Connect the rectangle corners in the order they were calculated
+    corners = np.array([
+        [global_points[0], global_points[1]],
+        [global_points[1], global_points[2]],
+        [global_points[2], global_points[3]],
+        [global_points[3], global_points[0]]
+    ])
+    
+    for corner in corners:
+        ax.plot(corner[:, 0], corner[:, 1], corner[:, 2], 'ro-')
 
-# Appliquer la transformation aux points du chemin
-transformed_points = np.dot(transformation_matrix, np.vstack([points_initial.T, np.ones(points_initial.shape[0])]))
+    ax.set_title('3D Rectangle')
+    ax.set_xlabel('X-axis')
+    ax.set_ylabel('Y-axis')
+    ax.set_zlabel('Z-axis')
+    plt.show()
 
-# Les nouveaux points sont dans transformed_points[:2, :]. Vous pouvez les utiliser pour le nouveau chemin.
+# Example usage with quaternion
+x_obj = 50
+y_obj = 30
+quaternion = [1, 0, 0, 0.0]  # Example quaternion for 45 degrees rotation about Z-axis
+
+rectangle_points = create_rectangle_points(x_obj, y_obj, quaternion)
+plot_3d_rectangle(rectangle_points)
