@@ -4,6 +4,7 @@ README for ur5
 TERMINAL 1
 cd Optitrack_ROS2/ros1_ws/docker
 bash start_optitrack.sh
+if docker not work: roslaunch opt tab
  
 
 TERMINAL 2
