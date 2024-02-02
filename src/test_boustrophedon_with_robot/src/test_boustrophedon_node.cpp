@@ -37,7 +37,7 @@ class Optitrack {       // The class
         quat_obj   = {msg->pose.orientation.x,msg->pose.orientation.y,msg->pose.orientation.z,msg->pose.orientation.w};
     } 
 
-    boustrophedon_msgs::PlanMowingPathGoal  ComputeGoal(double width = 0.64, double height = 0.49) {
+    boustrophedon_msgs::PlanMowingPathGoal  ComputeGoal(double width = 0.32, double height = 0.25) {
 
       double x = width/2;
       double y = height/2;
@@ -172,6 +172,7 @@ Eigen::Quaterniond orientation() {
 //------------- define all parameter----------------------------------------------------------------------
 geometry_msgs::Quaternion headingToQuaternion(double x, double y, double z);
 Eigen::Matrix3f quaternionToRotationMatrix(Eigen::Vector4f q);
+void updateLimitCycle3DPosVel_with2DLC(Eigen::Vector3f pose, Eigen::Vector3f target_pose_cricleDS,Eigen::Vector4f desired_ori_);
 
 bool got_initial_pose = false;
 geometry_msgs::PoseStamped initial_pose;
@@ -184,7 +185,7 @@ Eigen::Vector4f real_pose_ori_;
 Eigen::Matrix3f _wRb;				// Current rotation matrix [m] (3x1)
 Eigen::Vector3f _x;				// Current position [m] (3x1)
 Eigen::Vector4f _q;				// Current end effector quaternion (4x1)  
-double _toolOffsetFromEE= 0.23f;//---- knife tool with f/t sensor
+double _toolOffsetFromEE= 0.25f;//---- knife tool with f/t sensor
 bool _firstRealPoseReceived;
 
 Eigen::Vector3f desired_vel_;
@@ -195,6 +196,15 @@ geometry_msgs::Twist msg_desired_vel_;
 geometry_msgs::Pose  msg_desired_vel_filtered_;
 
 std::size_t i_follow = 0;
+
+int fs=300;
+double dt_=1.0/fs;
+Eigen::Vector3f target_pose_;
+Eigen::Vector4f desired_ori_velocity_filtered_;
+Eigen::Vector3f vd;
+
+double Velocity_limit_=0.5;
+
 
 //----------------define all function-------------------------------------
 // server has a service to convert StripingPlan to Path, but all it does it call this method
@@ -249,12 +259,13 @@ bool convertStripingPlanToPath(const boustrophedon_msgs::StripingPlan& striping_
 }
 // this function take the path comoute from server and create a linear DS
 //when the eef is close the the next point it change the goal until the last point of the path
-Eigen::Vector3f calaulteVelocityCommand(nav_msgs::Path& path_transf, Eigen::Vector3f real_pose_)
+Eigen::Vector3f calaulteVelocityCommand(nav_msgs::Path& path_transf, Eigen::Vector3f real_pose_,Eigen::Vector4f desired_ori_)
 {
   double dx,dy,dz;
-  double scale_vel=1.2;
+  double scale_vel=0.1;
   Eigen::Vector3f d_vel_;
   Eigen::Vector3f path_point;
+  
 
   if (i_follow < path_transf.poses.size() - 1)
   {
@@ -275,7 +286,8 @@ Eigen::Vector3f calaulteVelocityCommand(nav_msgs::Path& path_transf, Eigen::Vect
     d_vel_(1)=dy*scale_vel;
     d_vel_(2)=dz*scale_vel;
 
-    if (d_vel_.norm()<=0.04)
+    std::cerr<<"std::sqrt((path_point - real_pose_).norm()): "<<std::sqrt((path_point - real_pose_).norm())<< std::endl;
+    if (std::sqrt((path_point - real_pose_).norm())<=0.2)
     {
       i_follow+=1;
     }
@@ -290,22 +302,45 @@ Eigen::Vector3f calaulteVelocityCommand(nav_msgs::Path& path_transf, Eigen::Vect
     dy = path_point(1) - real_pose_(1);
     dz = path_point(0) - real_pose_(2);
 
-    d_vel_(0)=dx;
-    d_vel_(1)=dy;
-    d_vel_(2)=dz;
+    d_vel_(0)=dx*scale_vel;
+    d_vel_(1)=dy*scale_vel;
+    d_vel_(2)=dz*scale_vel;
   }
 
-  // std::cerr<<"i_follow: "<<i_follow << std::endl;
+  if (i_follow!=0)
+  {
+    target_pose_+=d_vel_*dt_;
+    // std::cerr<<"target_pose_+=d_vel_*dt_: "<< target_pose_(0) <<","<< target_pose_(1) <<","<< target_pose_(2) <<"," << std::endl;
+    // std::cerr<<"d_vel_*dt_: "<< d_vel_*dt_ << std::endl;
+    // std::cerr<<"dt_: "<< dt_ << std::endl;
+  }
+  
+
+  updateLimitCycle3DPosVel_with2DLC(real_pose_,target_pose_,desired_ori_);
+  
+  if (vd.norm() > Velocity_limit_) {
+    vd = vd / vd.norm() * Velocity_limit_;
+      ROS_WARN_STREAM_THROTTLE(0.2, "TOO FAST");
+    }
+
+  std::cerr<<"i_follow: "<<i_follow << std::endl;
   // std::cerr<<"real_pose_: "<< real_pose_(0) <<","<< real_pose_(1) <<","<< real_pose_(2) <<"," << std::endl;
   // std::cerr<<"striping_plan: "<< path_transf.poses[i_follow + 1].pose.position.x<<","
   //                             << path_transf.poses[i_follow + 1].pose.position.y <<","
   //                             << path_transf.poses[i_follow + 1].pose.position.z<<"," << std::endl;
   // std::cerr<<"vel dx: "<< dx <<","<< dy <<","<< dz <<"," << std::endl;
-  // std::cerr<<"d_vel_: "<< d_vel_(0) <<","<< d_vel_(1) <<","<< d_vel_(2) <<"," << std::endl;
+  std::cerr<<"d_vel_: "<< d_vel_(0) <<","<< d_vel_(1) <<","<< d_vel_(2) <<"," << std::endl;
   // std::cerr<<"d_vel_.norm(): "<<d_vel_.norm() << std::endl;
+  std::cerr<<"vd: "<< vd(0) <<","<< vd(1) <<","<< vd(2) <<"," << std::endl;
+  std::cerr<<"desired_ori_: "<< desired_ori_(0) <<","<< desired_ori_(1) <<","<< desired_ori_(2) <<","<< desired_ori_(3) <<"," << std::endl;
+  std::cerr<<"target_pose_: "<< target_pose_(0) <<","<< target_pose_(1) <<","<< target_pose_(2) <<"," << std::endl;
 
-  return d_vel_;
+  return vd;
+  // return d_vel_;
 }
+
+
+
 
 
 void initialPoseCallback(const geometry_msgs::PoseWithCovarianceStampedConstPtr init_pose)
@@ -376,12 +411,15 @@ int main(int argc, char** argv)
 
     ros::Subscriber sub_real_pose_= 
         n.subscribe( robot_name + "/ee_info/Pose" , 1000, &UpdateRealPosition, ros::TransportHints().reliable().tcpNoDelay());
+    // ros::Subscriber sub_real_pose_= 
+    //     n.subscribe( "/iiwa/ee_info/Pose" , 1000, &UpdateRealPosition, ros::TransportHints().reliable().tcpNoDelay());
     // ros::Publisher pub_desired_vel_ = 
     //     n.advertise<geometry_msgs::Twist>("/passive_control/vel_quat", 1);   
     ros::Publisher pub_desired_vel_filtered_ = 
         n.advertise<geometry_msgs::Pose>("/passive_control/vel_quat", 1);
 
-    ros::Rate loop_rate(10);
+    
+    ros::Rate loop_rate(fs);
 
     ROS_INFO("Waiting for action server to start.");
     // wait for the action server to start
@@ -430,6 +468,9 @@ int main(int argc, char** argv)
       ros::spinOnce();
       loop_rate.sleep();
     }
+
+
+
     while (ros::ok())
     {
       ros::Time start_time = ros::Time::now();
@@ -443,16 +484,33 @@ int main(int argc, char** argv)
       //ROS_INFO_STREAM("Time elapsed: " << elapsed_time.toSec() << " seconds");
 
       // ROS_INFO_STREAM("real_pose_: " << real_pose_ );
+
+      if (i_follow==0)
+      {
+        target_pose_(0)=path_transformed.poses[0].pose.position.x;
+        target_pose_(1)=path_transformed.poses[0].pose.position.y;
+        target_pose_(2)=path_transformed.poses[0].pose.position.z;
+        // target_pose_(0)=0.6;
+        // target_pose_(1)=0.0;
+        // target_pose_(2)=0.6;
+      }
       
-      desired_vel_filtered_=calaulteVelocityCommand(path_transformed, real_pose_);
+
+      //--- here waiting for orinetation control
+        desired_ori_velocity_filtered_(0)=optitrack.quat_obj(0);
+        desired_ori_velocity_filtered_(1)=optitrack.quat_obj(1);
+        desired_ori_velocity_filtered_(2)=optitrack.quat_obj(2);
+        desired_ori_velocity_filtered_(3)=optitrack.quat_obj(3);
+      
+      desired_vel_filtered_=calaulteVelocityCommand(path_transformed, real_pose_,desired_ori_velocity_filtered_);
       //ROS_INFO_STREAM("desired_vel_filtered_: " << desired_vel_filtered_ );
       msg_desired_vel_filtered_.position.x  = desired_vel_filtered_(0);
       msg_desired_vel_filtered_.position.y  = desired_vel_filtered_(1);
       msg_desired_vel_filtered_.position.z  = desired_vel_filtered_(2);
-      msg_desired_vel_filtered_.orientation.x = optitrack.quat_obj(0);
-      msg_desired_vel_filtered_.orientation.y = optitrack.quat_obj(1);  
-      msg_desired_vel_filtered_.orientation.z = optitrack.quat_obj(2);  
-      msg_desired_vel_filtered_.orientation.w = optitrack.quat_obj(3);  
+      msg_desired_vel_filtered_.orientation.x = desired_ori_velocity_filtered_(0);
+      msg_desired_vel_filtered_.orientation.y = desired_ori_velocity_filtered_(1);  
+      msg_desired_vel_filtered_.orientation.z = desired_ori_velocity_filtered_(2);  
+      msg_desired_vel_filtered_.orientation.w = desired_ori_velocity_filtered_(3);  
       pub_desired_vel_filtered_.publish(msg_desired_vel_filtered_);
       
 
@@ -514,4 +572,69 @@ Eigen::Matrix3f quaternionToRotationMatrix(Eigen::Vector4f q)
 
   return R;
 }
+
+void updateLimitCycle3DPosVel_with2DLC(Eigen::Vector3f pose, Eigen::Vector3f target_pose_cricleDS,Eigen::Vector4f desired_ori_) 
+{
+	double Convergence_Rate_LC_=10;
+	double Cycle_radius_LC_=0.015;
+	double Cycle_speed_LC_=8;
+	float a[2] = {1., 1.};
+	float norm_a=std::sqrt(a[0]*a[0]+a[1]*a[1]);
+	for (int i=0; i<2; i++)
+			a[i]=a[i]/norm_a;
+
+	Eigen::Vector3f velocity;
+	Eigen::Vector3f pose_eig;
+
+	//--- trans real ori to rotation matrix
+		Eigen::Vector4f new_quat;
+		new_quat(0)=desired_ori_velocity_filtered_(3);
+		new_quat(1)=desired_ori_velocity_filtered_(0);
+		new_quat(2)=desired_ori_velocity_filtered_(1);
+		new_quat(3)=desired_ori_velocity_filtered_(2);
+		Eigen::Matrix3f rotMat = quaternionToRotationMatrix(new_quat);
+
+  std::cerr<<"pose: "<< pose(0) <<","<< pose(1) <<","<< pose(2) <<"," << std::endl;
+  std::cerr<<"target_pose_cricleDS: "<< target_pose_cricleDS(0) <<","<< target_pose_cricleDS(1) <<","<< target_pose_cricleDS(2) <<"," << std::endl;
+
+	pose = pose-target_pose_cricleDS;
+	for (size_t i = 0; i < 3; i++)
+	{
+		pose_eig(i)=pose(i);
+	}
+	pose_eig = rotMat.transpose() * pose_eig;
+	for (int i=0; i<2; i++)
+			pose_eig(i) = a[i] * pose_eig(i);
+
+	double x_vel,y_vel,z_vel,R,T,cricle_plane_error;
+
+	x_vel = 0;
+	y_vel = 0;
+	z_vel = - Convergence_Rate_LC_ * pose_eig(2);
+
+	R = sqrt(pose_eig(0) * pose_eig(0) + pose_eig(1) * pose_eig(1));
+	T = atan2(pose_eig(1), pose_eig(0));
+
+	double Rdot = - Convergence_Rate_LC_ * (R - Cycle_radius_LC_);
+	double Tdot = Cycle_speed_LC_;
+
+	x_vel = Rdot * cos(T) - R * Tdot * sin(T);
+	y_vel = Rdot * sin(T) + R * Tdot * cos(T);
+	cricle_plane_error=pose_eig(2);
+
+	velocity(0) = x_vel;
+	velocity(1) = y_vel;
+	velocity(2) = z_vel;
+
+	velocity=rotMat*velocity;
+
+	for(int i=0; i<3; i++){
+		vd[i] = velocity(i);
+	}
+
+
+}
+
+
+
 
