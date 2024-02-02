@@ -5,6 +5,7 @@ TERMINAL 1
 cd Optitrack_ROS2/ros1_ws/docker
 bash start_optitrack.sh
 if docker not work automatically, run this in docker env: roslaunch optitrack_publisher optitrack_with_transform_to_base.launch
+if still not work, catkin_make in /Optitrack_ROS2/ros1_ws, then: source devel/setup.bash
  
 
 TERMINAL 2
