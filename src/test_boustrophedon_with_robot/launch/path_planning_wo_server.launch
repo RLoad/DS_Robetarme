@@ -2,8 +2,9 @@
 <launch>
 
 #---- yaml set taget
- <arg name="robot" default="ur5"/>
- <param name="robot" value="$(arg robot)"/>
- <node name="test_boul" pkg="test_boustrophedon_with_robot"  type="test_boustrophedon_with_robot_node" output="screen"/>
+<arg name="robot" default="ur5"/>
+<param name="robot" value="$(arg robot)"/>
+
+<node name="test_boul" pkg="test_boustrophedon_with_robot"  type="test_boustrophedon_with_robot_node" output="screen"/>
 
 </launch>

@@ -16,12 +16,15 @@
 #include <eigen3/Eigen/Dense>
 #include <eigen3/Eigen/Geometry>
 #include <eigen3/Eigen/Core>
+#include <iostream>
+#include <cmath>
 
-// #include "test_mini_code.h"
 class Optitrack {       // The class
     public:             // Access specifier
+    std::vector<double> FirstPos;
     Eigen::Vector3d pos_obj;
     Eigen::Vector4d quat_obj;
+    double height_target, width_target, optimum_radius, new_rad;
     std::vector<double> p1,p2,p3,p4;
     geometry_msgs::PoseStamped msgP;
     std::string name_base;
@@ -30,6 +33,8 @@ class Optitrack {       // The class
         pose_subscriber_ = nh.subscribe("/vrpn_client_node/TargetRobetarme/pose_transform", 10, &Optitrack::CC_vrpn_obj, this);
         initialPosePub_ = nh.advertise<geometry_msgs::PoseWithCovarianceStamped>("/initialpose", 10);
         nh.getParam("/optitrack_publisher/name_base_optitrack", name_base);
+        transformedPolygon_ = nh.advertise<geometry_msgs::PolygonStamped>("/transformed_polygon", 1, true);
+        visualizeCut(nh);
     }
 
     void CC_vrpn_obj(const geometry_msgs::PoseStamped::ConstPtr msg) {  // Method/function defined inside the class
@@ -37,10 +42,31 @@ class Optitrack {       // The class
         quat_obj   = {msg->pose.orientation.x,msg->pose.orientation.y,msg->pose.orientation.z,msg->pose.orientation.w};
     } 
 
-    boustrophedon_msgs::PlanMowingPathGoal  ComputeGoal(double width = 0.32, double height = 0.25) {
+    void visualizeCut(ros::NodeHandle& n) {
+        // Retrieve parameters from ROS Parameter Server
+        n.getParam("height_target", height_target);
+        n.getParam("width_target", width_target);
+        n.getParam("optimum_radius", optimum_radius);
+        // Rest of the code remains the same
+        int sections_height = std::round(height_target / optimum_radius);
+        int sections_width = std::round(width_target / optimum_radius);
+        new_rad = (height_target / sections_height + width_target / sections_width) / 2.0;
 
-      double x = width/2;
-      double y = height/2;
+        std::cout << "Nombre de sections en hauteur : " << sections_height << std::endl;
+        std::cout << "Nombre de sections en largeur : " << sections_width << std::endl;
+        std::cout << "Valeur réelle de z en  : " << new_rad << std::endl;
+        // Publish z_actual_height and z_actual_width as ROS parameters
+        n.setParam("new_rad", new_rad);
+        //n.setParam("/boustrophedon_server/stripe_separation", new_rad);
+
+    }
+
+    boustrophedon_msgs::PlanMowingPathGoal  ComputeGoal() {
+
+
+        // for reduced target
+      double x = (width_target-2*new_rad)/2;
+      double y = (height_target-2*new_rad)/2;
       
       p1 = {pos_obj(0)+x, pos_obj(1)+y,pos_obj(2)};
       p2 = {pos_obj(0)-x, pos_obj(1)+y,pos_obj(2)};
@@ -49,6 +75,7 @@ class Optitrack {       // The class
       name_base = "base";
 
 
+      //polygon for the server
       boustrophedon_msgs::PlanMowingPathGoal goal;
 
       goal.property.header.stamp = ros::Time::now();
@@ -72,11 +99,53 @@ class Optitrack {       // The class
       goal.robot_position.pose.orientation.z = 0.0;
       goal.robot_position.pose.orientation.w = 1.0;
 
+
+      //for real target
+      x = (width_target)/2;
+      y = (height_target)/2;
+      
+      p1 = {pos_obj(0)+x, pos_obj(1)+y,pos_obj(2)};
+      p2 = {pos_obj(0)-x, pos_obj(1)+y,pos_obj(2)};
+      p3 = {pos_obj(0)-x, pos_obj(1)-y,pos_obj(2)};
+      p4 = {pos_obj(0)+x, pos_obj(1)-y,pos_obj(2)};
+
     return goal;
 }
+  void visualTarget(){
+
+      //polygon for the visualiton on the target
+      Eigen::Affine3d transformation = Eigen::Translation3d(pos_obj(0),pos_obj(1),pos_obj(2)) * Eigen::Quaterniond(quat_obj(3),quat_obj(0),quat_obj(1),quat_obj(2));
+      Eigen::Vector3d point1(p1[0],p1[1],p1[2]);
+      Eigen::Vector3d point2(p2[0],p2[1],p2[2]);
+      Eigen::Vector3d point3(p3[0],p3[1],p3[2]);
+      Eigen::Vector3d point4(p4[0],p4[1],p4[2]);
+      // Transform each point
+      Eigen::Vector3d transformedPoint1 = transformation * point1;
+      Eigen::Vector3d transformedPoint2 = transformation * point2;
+      Eigen::Vector3d transformedPoint3 = transformation * point3;
+      Eigen::Vector3d transformedPoint4 = transformation * point4;
+
+    
+      geometry_msgs::PolygonStamped visualpolygonTarget;
+      std::vector<Eigen::Vector3d> polygonPoints = {transformedPoint1, transformedPoint2, transformedPoint3, transformedPoint4};
+      visualpolygonTarget.header.frame_id = "base";  
+      visualpolygonTarget.header.stamp = ros::Time::now();
+
+      for (const auto& point : polygonPoints) {
+          geometry_msgs::Point32 msg_point;
+          msg_point.x = point.x();
+          msg_point.y = point.y();
+          msg_point.z = point.z();
+          visualpolygonTarget.polygon.points.push_back(msg_point);
+      }
+      transformedPolygon_.publish(visualpolygonTarget);
+  }
+
+
+
   void publishInitialPose() {
 
-      double delta = 0.1;
+      double delta = 0.3;
       // Create a publisher for the /initialpose topic
 
       // Create and fill the message
@@ -97,9 +166,10 @@ class Optitrack {       // The class
       initialPoseMsg.pose.covariance.fill(0.0);  // Fill the covariance with zeros
 
       initialPosePub_.publish(initialPoseMsg);
+      
   }
 
-
+  
   nav_msgs::Path transformPath(const nav_msgs::Path& originalPath) {
     nav_msgs::Path transformedPath;
     Eigen::Affine3d transformation = Eigen::Translation3d(pos_obj(0),pos_obj(1),pos_obj(2)) * Eigen::Quaterniond(quat_obj(3),quat_obj(0),quat_obj(1),quat_obj(2));
@@ -137,42 +207,18 @@ class Optitrack {       // The class
     return transformedPath;
 }
 
-Eigen::Quaterniond orientation() {
-    // Initial quaternion (replace with your values)
-    Eigen::Quaterniond initialQuaternion(quat_obj(3),quat_obj(0),quat_obj(1),quat_obj(2));
-
-    // Rotation axis (x-axis in this case)
-    Eigen::Vector3d rotationAxis(0.0, 1.0, 0.0);
-
-    // Rotation angle (180 degrees)
-    double rotationAngle = M_PI;  // M_PI is the constant for pi
-
-    // Create a quaternion representing the rotation
-    Eigen::Quaterniond rotationQuaternion(Eigen::AngleAxisd(rotationAngle, rotationAxis));
-    
-
-    // Perform the rotation
-    Eigen::Quaterniond finalQuaternion = rotationQuaternion * initialQuaternion;
-
-    // // Display the results
-    // std::cout << "Initial Quaternion: " << initialQuaternion.coeffs().transpose() << std::endl;
-    // std::cout << "Rotation Quaternion: " << rotationQuaternion.coeffs().transpose() << std::endl;
-    // std::cout << "Final Quaternion: " << finalQuaternion.coeffs().transpose() << std::endl;
-
-    return finalQuaternion;
-}
-
-
 
     private:
     ros::Subscriber pose_subscriber_;
     ros::Publisher initialPosePub_;
+    ros::Publisher transformedPolygon_;
+
 };
 
 //------------- define all parameter----------------------------------------------------------------------
 geometry_msgs::Quaternion headingToQuaternion(double x, double y, double z);
 Eigen::Matrix3f quaternionToRotationMatrix(Eigen::Vector4f q);
-void updateLimitCycle3DPosVel_with2DLC(Eigen::Vector3f pose, Eigen::Vector3f target_pose_cricleDS,Eigen::Vector4f desired_ori_);
+void updateLimitCycle3DPosVel_with2DLC(Eigen::Vector3f pose, Eigen::Vector3f target_pose_cricleDS,Eigen::Vector4f desired_ori_, double radius);
 
 bool got_initial_pose = false;
 geometry_msgs::PoseStamped initial_pose;
@@ -259,10 +305,12 @@ bool convertStripingPlanToPath(const boustrophedon_msgs::StripingPlan& striping_
 }
 // this function take the path comoute from server and create a linear DS
 //when the eef is close the the next point it change the goal until the last point of the path
-Eigen::Vector3f calaulteVelocityCommand(nav_msgs::Path& path_transf, Eigen::Vector3f real_pose_,Eigen::Vector4f desired_ori_)
+Eigen::Vector3f calaulteVelocityCommand(nav_msgs::Path& path_transf, Eigen::Vector3f real_pose_,Eigen::Vector4f desired_ori_,double radius)
 {
   double dx,dy,dz;
-  double scale_vel=0.1;
+  double desired_vel=0.1;
+  double norm;
+  double scale_vel;
   Eigen::Vector3f d_vel_;
   Eigen::Vector3f path_point;
   
@@ -282,15 +330,19 @@ Eigen::Vector3f calaulteVelocityCommand(nav_msgs::Path& path_transf, Eigen::Vect
     dy = path_point(1) - real_pose_(1);
     dz = path_point(2) - real_pose_(2);
 
+    norm = sqrt(dx*dx+dy*dy+dz*dz);
+    scale_vel = desired_vel/norm;
+
     d_vel_(0)=dx*scale_vel;
     d_vel_(1)=dy*scale_vel;
     d_vel_(2)=dz*scale_vel;
 
-    std::cerr<<"std::sqrt((path_point - real_pose_).norm()): "<<std::sqrt((path_point - real_pose_).norm())<< std::endl;
-    if (std::sqrt((path_point - real_pose_).norm())<=0.2)
+    // std::cerr<<"std::sqrt((path_point - real_pose_).norm()): "<<std::sqrt((path_point - real_pose_).norm())<< std::endl;
+    if (std::sqrt((path_point - real_pose_).norm())<=0.05)
     {
       i_follow+=1;
     }
+    updateLimitCycle3DPosVel_with2DLC(real_pose_,target_pose_,desired_ori_, radius );
 
   }else
   {
@@ -301,6 +353,9 @@ Eigen::Vector3f calaulteVelocityCommand(nav_msgs::Path& path_transf, Eigen::Vect
     dx = path_point(2) - real_pose_(0);
     dy = path_point(1) - real_pose_(1);
     dz = path_point(0) - real_pose_(2);
+
+    norm = sqrt(dx*dx+dy*dy+dz*dz);
+    scale_vel = desired_vel/norm;
 
     d_vel_(0)=dx*scale_vel;
     d_vel_(1)=dy*scale_vel;
@@ -316,27 +371,26 @@ Eigen::Vector3f calaulteVelocityCommand(nav_msgs::Path& path_transf, Eigen::Vect
   }
   
 
-  updateLimitCycle3DPosVel_with2DLC(real_pose_,target_pose_,desired_ori_);
   
   if (vd.norm() > Velocity_limit_) {
     vd = vd / vd.norm() * Velocity_limit_;
-      ROS_WARN_STREAM_THROTTLE(0.2, "TOO FAST");
+      ROS_WARN_STREAM_THROTTLE(1.5, "TOO FAST");
     }
 
-  std::cerr<<"i_follow: "<<i_follow << std::endl;
-  // std::cerr<<"real_pose_: "<< real_pose_(0) <<","<< real_pose_(1) <<","<< real_pose_(2) <<"," << std::endl;
-  // std::cerr<<"striping_plan: "<< path_transf.poses[i_follow + 1].pose.position.x<<","
-  //                             << path_transf.poses[i_follow + 1].pose.position.y <<","
-  //                             << path_transf.poses[i_follow + 1].pose.position.z<<"," << std::endl;
-  // std::cerr<<"vel dx: "<< dx <<","<< dy <<","<< dz <<"," << std::endl;
-  std::cerr<<"d_vel_: "<< d_vel_(0) <<","<< d_vel_(1) <<","<< d_vel_(2) <<"," << std::endl;
-  // std::cerr<<"d_vel_.norm(): "<<d_vel_.norm() << std::endl;
-  std::cerr<<"vd: "<< vd(0) <<","<< vd(1) <<","<< vd(2) <<"," << std::endl;
-  std::cerr<<"desired_ori_: "<< desired_ori_(0) <<","<< desired_ori_(1) <<","<< desired_ori_(2) <<","<< desired_ori_(3) <<"," << std::endl;
-  std::cerr<<"target_pose_: "<< target_pose_(0) <<","<< target_pose_(1) <<","<< target_pose_(2) <<"," << std::endl;
+  // std::cerr<<"i_follow: "<<i_follow << std::endl;
+  // // std::cerr<<"real_pose_: "<< real_pose_(0) <<","<< real_pose_(1) <<","<< real_pose_(2) <<"," << std::endl;
+  // // std::cerr<<"striping_plan: "<< path_transf.poses[i_follow + 1].pose.position.x<<","
+  // //                             << path_transf.poses[i_follow + 1].pose.position.y <<","
+  // //                             << path_transf.poses[i_follow + 1].pose.position.z<<"," << std::endl;
+  // // std::cerr<<"vel dx: "<< dx <<","<< dy <<","<< dz <<"," << std::endl;
+  // std::cerr<<"d_vel_: "<< d_vel_(0) <<","<< d_vel_(1) <<","<< d_vel_(2) <<"," << std::endl;
+  // // std::cerr<<"d_vel_.norm(): "<<d_vel_.norm() << std::endl;
+  // std::cerr<<"vd: "<< vd(0) <<","<< vd(1) <<","<< vd(2) <<"," << std::endl;
+  // std::cerr<<"desired_ori_: "<< desired_ori_(0) <<","<< desired_ori_(1) <<","<< desired_ori_(2) <<","<< desired_ori_(3) <<"," << std::endl;
+  // std::cerr<<"target_pose_: "<< target_pose_(0) <<","<< target_pose_(1) <<","<< target_pose_(2) <<"," << std::endl;
 
   return vd;
-  // return d_vel_;
+  //return d_vel_;
 }
 
 
@@ -459,10 +513,12 @@ int main(int argc, char** argv)
       else{
         ROS_INFO("Action finished: %s", state.toString().c_str());
 
-        std::cout << "Result with : " << result->plan.points.size() << std::endl;
+        std::cout << "two small Result with : " << result->plan.points.size() << std::endl;
 
-        convertStripingPlanToPath(result->plan, path);
-        break;
+        if (result->plan.points.size() >=5){
+          convertStripingPlanToPath(result->plan, path);
+          break;
+        }
       }
 
       ros::spinOnce();
@@ -470,9 +526,10 @@ int main(int argc, char** argv)
     }
 
 
-
     while (ros::ok())
     {
+      optitrack.visualTarget();
+
       ros::Time start_time = ros::Time::now();
 
       nav_msgs::Path path_transformed = optitrack.transformPath(path);
@@ -490,19 +547,38 @@ int main(int argc, char** argv)
         target_pose_(0)=path_transformed.poses[0].pose.position.x;
         target_pose_(1)=path_transformed.poses[0].pose.position.y;
         target_pose_(2)=path_transformed.poses[0].pose.position.z;
-        // target_pose_(0)=0.6;
-        // target_pose_(1)=0.0;
-        // target_pose_(2)=0.6;
+        // Set values for a single ROS parameter
+        std::vector<double> parameter_quat = {optitrack.quat_obj(0),optitrack.quat_obj(1),optitrack.quat_obj(2),optitrack.quat_obj(3)};
+        n.setParam("/initialQuat", parameter_quat);
+
+        Eigen::Vector4f Quat4f = optitrack.quat_obj.cast<float>();
+        
+        _wRb = quaternionToRotationMatrix(Quat4f);
+        Eigen::Quaterniond quaternion(optitrack.quat_obj(3),optitrack.quat_obj(0),optitrack.quat_obj(1),optitrack.quat_obj(2));
+        Eigen::Matrix3d rotationMatrix = quaternion.toRotationMatrix();
+        Eigen::Vector3d target_pose_3d(target_pose_(0), target_pose_(1), target_pose_(2));
+        Eigen::Vector3d parameter_pos3f = target_pose_3d- _toolOffsetFromEE*rotationMatrix.col(2);
+        // Eigen::Vector3f parameter_pos3f = target_pose_ - _toolOffsetFromEE*_wRb.col(2);
+        
+        std::vector<double> parameter_pos;
+        parameter_pos.reserve(parameter_pos3f.size());  // Reserve space for efficiency
+
+        for (int i = 0; i < parameter_pos3f.size(); ++i) {
+            parameter_pos.push_back(static_cast<double>(parameter_pos3f[i]));
+        }
+        n.setParam("/initialPos", parameter_pos);
       }
       
 
       //--- here waiting for orinetation control
-        desired_ori_velocity_filtered_(0)=optitrack.quat_obj(0);
-        desired_ori_velocity_filtered_(1)=optitrack.quat_obj(1);
-        desired_ori_velocity_filtered_(2)=optitrack.quat_obj(2);
-        desired_ori_velocity_filtered_(3)=optitrack.quat_obj(3);
-      
-      desired_vel_filtered_=calaulteVelocityCommand(path_transformed, real_pose_,desired_ori_velocity_filtered_);
+      desired_ori_velocity_filtered_(0)=optitrack.quat_obj(0);
+      desired_ori_velocity_filtered_(1)=optitrack.quat_obj(1);
+      desired_ori_velocity_filtered_(2)=optitrack.quat_obj(2);
+      desired_ori_velocity_filtered_(3)=optitrack.quat_obj(3);
+      double new_rad;
+      n.getParam("new_rad", new_rad);
+
+      desired_vel_filtered_=calaulteVelocityCommand(path_transformed, real_pose_,desired_ori_velocity_filtered_, new_rad);
       //ROS_INFO_STREAM("desired_vel_filtered_: " << desired_vel_filtered_ );
       msg_desired_vel_filtered_.position.x  = desired_vel_filtered_(0);
       msg_desired_vel_filtered_.position.y  = desired_vel_filtered_(1);
@@ -570,10 +646,10 @@ Eigen::Matrix3f quaternionToRotationMatrix(Eigen::Vector4f q)
   return R;
 }
 
-void updateLimitCycle3DPosVel_with2DLC(Eigen::Vector3f pose, Eigen::Vector3f target_pose_cricleDS,Eigen::Vector4f desired_ori_) 
+void updateLimitCycle3DPosVel_with2DLC(Eigen::Vector3f pose, Eigen::Vector3f target_pose_cricleDS,Eigen::Vector4f desired_ori_, double radius) 
 {
 	double Convergence_Rate_LC_=10;
-	double Cycle_radius_LC_=0.015;
+	double Cycle_radius_LC_=radius;//0.015;
 	double Cycle_speed_LC_=8;
 	float a[2] = {1., 1.};
 	float norm_a=std::sqrt(a[0]*a[0]+a[1]*a[1]);
@@ -591,8 +667,8 @@ void updateLimitCycle3DPosVel_with2DLC(Eigen::Vector3f pose, Eigen::Vector3f tar
 		new_quat(3)=desired_ori_velocity_filtered_(2);
 		Eigen::Matrix3f rotMat = quaternionToRotationMatrix(new_quat);
 
-  std::cerr<<"pose: "<< pose(0) <<","<< pose(1) <<","<< pose(2) <<"," << std::endl;
-  std::cerr<<"target_pose_cricleDS: "<< target_pose_cricleDS(0) <<","<< target_pose_cricleDS(1) <<","<< target_pose_cricleDS(2) <<"," << std::endl;
+  // std::cerr<<"pose: "<< pose(0) <<","<< pose(1) <<","<< pose(2) <<"," << std::endl;
+  // std::cerr<<"target_pose_cricleDS: "<< target_pose_cricleDS(0) <<","<< target_pose_cricleDS(1) <<","<< target_pose_cricleDS(2) <<"," << std::endl;
 
 	pose = pose-target_pose_cricleDS;
 	for (size_t i = 0; i < 3; i++)
