@@ -19,7 +19,7 @@
 #include <iostream>
 #include <cmath>
 
-class Optitrack {       // The class
+class PathPlanning {       // The class
     public:             // Access specifier
     std::vector<double> FirstPos;
     Eigen::Vector3d pos_obj;
@@ -28,9 +28,9 @@ class Optitrack {       // The class
     std::vector<double> p1,p2,p3,p4;
     geometry_msgs::PoseStamped msgP;
     std::string name_base;
-    Optitrack(ros::NodeHandle& nh) {
+    PathPlanning(ros::NodeHandle& nh) {
         // Subscribe to the PoseStamped topic
-        pose_subscriber_ = nh.subscribe("/vrpn_client_node/TargetRobetarme/pose_transform", 10, &Optitrack::CC_vrpn_obj, this);
+        pose_subscriber_ = nh.subscribe("/vrpn_client_node/TargetRobetarme/pose_transform", 10, &PathPlanning::CC_vrpn_obj, this);
         initialPosePub_ = nh.advertise<geometry_msgs::PoseWithCovarianceStamped>("/initialpose", 10);
         nh.getParam("/optitrack_publisher/name_base_optitrack", name_base);
         transformedPolygon_ = nh.advertise<geometry_msgs::PolygonStamped>("/transformed_polygon", 1, true);
@@ -215,6 +215,8 @@ class Optitrack {       // The class
 
 };
 
+
+
 //------------- define all parameter----------------------------------------------------------------------
 geometry_msgs::Quaternion headingToQuaternion(double x, double y, double z);
 Eigen::Matrix3f quaternionToRotationMatrix(Eigen::Vector4f q);
@@ -305,8 +307,9 @@ bool convertStripingPlanToPath(const boustrophedon_msgs::StripingPlan& striping_
 }
 // this function take the path comoute from server and create a linear DS
 //when the eef is close the the next point it change the goal until the last point of the path
-Eigen::Vector3f calaulteVelocityCommand(nav_msgs::Path& path_transf, Eigen::Vector3f real_pose_,Eigen::Vector4f desired_ori_,double radius)
+Eigen::Vector3f calculateVelocityCommand(nav_msgs::Path& path_transf, Eigen::Vector3f real_pose_,Eigen::Vector4f desired_ori_,double radius)
 {
+  double tol = 0.05;
   double dx,dy,dz;
   double desired_vel=0.1;
   double norm;
@@ -338,7 +341,7 @@ Eigen::Vector3f calaulteVelocityCommand(nav_msgs::Path& path_transf, Eigen::Vect
     d_vel_(2)=dz*scale_vel;
 
     // std::cerr<<"std::sqrt((path_point - real_pose_).norm()): "<<std::sqrt((path_point - real_pose_).norm())<< std::endl;
-    if (std::sqrt((path_point - real_pose_).norm())<=0.05)
+    if (std::sqrt((path_point - real_pose_).norm())<=tol)
     {
       i_follow+=1;
     }
@@ -360,6 +363,9 @@ Eigen::Vector3f calaulteVelocityCommand(nav_msgs::Path& path_transf, Eigen::Vect
     d_vel_(0)=dx*scale_vel;
     d_vel_(1)=dy*scale_vel;
     d_vel_(2)=dz*scale_vel;
+    vd(0) = 0;
+    vd(1) = 0;
+    vd(2) = 0;
   }
 
   if (i_follow!=0)
@@ -389,11 +395,9 @@ Eigen::Vector3f calaulteVelocityCommand(nav_msgs::Path& path_transf, Eigen::Vect
   // std::cerr<<"desired_ori_: "<< desired_ori_(0) <<","<< desired_ori_(1) <<","<< desired_ori_(2) <<","<< desired_ori_(3) <<"," << std::endl;
   // std::cerr<<"target_pose_: "<< target_pose_(0) <<","<< target_pose_(1) <<","<< target_pose_(2) <<"," << std::endl;
 
-  return vd;
-  //return d_vel_;
+  //return vd;
+  return d_vel_;
 }
-
-
 
 
 
@@ -455,7 +459,7 @@ int main(int argc, char** argv)
     ros::Subscriber init_pose = n.subscribe<geometry_msgs::PoseWithCovarianceStamped>("/initialpose", 1, initialPoseCallback);
 
    // Create an instance of PoseSubscriber
-    Optitrack optitrack(n);
+    PathPlanning pathplanning(n);
     // Define the parameter name
     std::string param_name = "robot";
     // Declare a variable to store the parameter value
@@ -482,12 +486,12 @@ int main(int argc, char** argv)
     ROS_INFO("Action server started");
 
     boustrophedon_msgs::PlanMowingPathGoal goal;
-    goal = optitrack.ComputeGoal();
+    goal = pathplanning.ComputeGoal();
 
     polygon_pub.publish(goal.property);
 
     ROS_INFO_STREAM("Waiting for goal");
-    optitrack.publishInitialPose();
+    pathplanning.publishInitialPose();
     nav_msgs::Path path;
 
     // extract initial_pose from optitrack center of marker
@@ -528,11 +532,11 @@ int main(int argc, char** argv)
 
     while (ros::ok())
     {
-      optitrack.visualTarget();
+      pathplanning.visualTarget();
 
       ros::Time start_time = ros::Time::now();
 
-      nav_msgs::Path path_transformed = optitrack.transformPath(path);
+      nav_msgs::Path path_transformed = pathplanning.transformPath(path);
 
       path_pub.publish(path_transformed);
 
@@ -548,13 +552,13 @@ int main(int argc, char** argv)
         target_pose_(1)=path_transformed.poses[0].pose.position.y;
         target_pose_(2)=path_transformed.poses[0].pose.position.z;
         // Set values for a single ROS parameter
-        std::vector<double> parameter_quat = {optitrack.quat_obj(0),optitrack.quat_obj(1),optitrack.quat_obj(2),optitrack.quat_obj(3)};
+        std::vector<double> parameter_quat = {pathplanning.quat_obj(0),pathplanning.quat_obj(1),pathplanning.quat_obj(2),pathplanning.quat_obj(3)};
         n.setParam("/initialQuat", parameter_quat);
 
-        Eigen::Vector4f Quat4f = optitrack.quat_obj.cast<float>();
+        Eigen::Vector4f Quat4f = pathplanning.quat_obj.cast<float>();
         
         _wRb = quaternionToRotationMatrix(Quat4f);
-        Eigen::Quaterniond quaternion(optitrack.quat_obj(3),optitrack.quat_obj(0),optitrack.quat_obj(1),optitrack.quat_obj(2));
+        Eigen::Quaterniond quaternion(pathplanning.quat_obj(3),pathplanning.quat_obj(0),pathplanning.quat_obj(1),pathplanning.quat_obj(2));
         Eigen::Matrix3d rotationMatrix = quaternion.toRotationMatrix();
         Eigen::Vector3d target_pose_3d(target_pose_(0), target_pose_(1), target_pose_(2));
         Eigen::Vector3d parameter_pos3f = target_pose_3d- _toolOffsetFromEE*rotationMatrix.col(2);
@@ -571,14 +575,14 @@ int main(int argc, char** argv)
       
 
       //--- here waiting for orinetation control
-      desired_ori_velocity_filtered_(0)=optitrack.quat_obj(0);
-      desired_ori_velocity_filtered_(1)=optitrack.quat_obj(1);
-      desired_ori_velocity_filtered_(2)=optitrack.quat_obj(2);
-      desired_ori_velocity_filtered_(3)=optitrack.quat_obj(3);
+      desired_ori_velocity_filtered_(0)=pathplanning.quat_obj(0);
+      desired_ori_velocity_filtered_(1)=pathplanning.quat_obj(1);
+      desired_ori_velocity_filtered_(2)=pathplanning.quat_obj(2);
+      desired_ori_velocity_filtered_(3)=pathplanning.quat_obj(3);
       double new_rad;
       n.getParam("new_rad", new_rad);
 
-      desired_vel_filtered_=calaulteVelocityCommand(path_transformed, real_pose_,desired_ori_velocity_filtered_, new_rad);
+      desired_vel_filtered_=calculateVelocityCommand(path_transformed, real_pose_,desired_ori_velocity_filtered_, new_rad);
       //ROS_INFO_STREAM("desired_vel_filtered_: " << desired_vel_filtered_ );
       msg_desired_vel_filtered_.position.x  = desired_vel_filtered_(0);
       msg_desired_vel_filtered_.position.y  = desired_vel_filtered_(1);
