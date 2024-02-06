@@ -24,7 +24,7 @@ class PathPlanning {       // The class
     std::vector<double> FirstPos;
     Eigen::Vector3d pos_obj;
     Eigen::Vector4d quat_obj;
-    double height_target, width_target, optimum_radius, new_rad;
+    double height_target, width_target, flow_radius, limit_cycle_radius ,sum_rad, optimum_radius;
     std::vector<double> p1,p2,p3,p4;
     geometry_msgs::PoseStamped msgP;
     std::string name_base;
@@ -46,18 +46,19 @@ class PathPlanning {       // The class
         // Retrieve parameters from ROS Parameter Server
         n.getParam("height_target", height_target);
         n.getParam("width_target", width_target);
-        n.getParam("optimum_radius", optimum_radius);
+        n.getParam("limit_cycle_radius", limit_cycle_radius);
+        n.getParam("flow_radius", flow_radius);
+        sum_rad = flow_radius + limit_cycle_radius;
         // Rest of the code remains the same
-        int sections_height = std::round(height_target / optimum_radius);
-        int sections_width = std::round(width_target / optimum_radius);
-        new_rad = (height_target / sections_height + width_target / sections_width) / 2.0;
+        int sections_height = std::round(height_target / sum_rad);
+        int sections_width = std::round(width_target / sum_rad);
+        optimum_radius = (height_target / sections_height + width_target / sections_width) / 2.0;
 
         std::cout << "Nombre de sections en hauteur : " << sections_height << std::endl;
         std::cout << "Nombre de sections en largeur : " << sections_width << std::endl;
-        std::cout << "Valeur réelle de z en  : " << new_rad << std::endl;
+        std::cout << "Valeur réelle de z en  : " << optimum_radius << std::endl;
         // Publish z_actual_height and z_actual_width as ROS parameters
-        n.setParam("new_rad", new_rad);
-        //n.setParam("/boustrophedon_server/stripe_separation", new_rad);
+        n.setParam("/boustrophedon_server/stripe_separation", 2*optimum_radius);
 
     }
 
@@ -65,8 +66,8 @@ class PathPlanning {       // The class
 
 
         // for reduced target
-      double x = (width_target-2*new_rad)/2;
-      double y = (height_target-2*new_rad)/2;
+      double x = (width_target-2*optimum_radius)/2;
+      double y = (height_target-2*optimum_radius)/2;
       
       p1 = {pos_obj(0)+x, pos_obj(1)+y,pos_obj(2)};
       p2 = {pos_obj(0)-x, pos_obj(1)+y,pos_obj(2)};
@@ -140,8 +141,6 @@ class PathPlanning {       // The class
       }
       transformedPolygon_.publish(visualpolygonTarget);
   }
-
-
 
   void publishInitialPose() {
 
@@ -311,7 +310,7 @@ Eigen::Vector3f calculateVelocityCommand(nav_msgs::Path& path_transf, Eigen::Vec
 {
   double tol = 0.05;
   double dx,dy,dz;
-  double desired_vel=0.1;
+  double desired_vel=0.02;
   double norm;
   double scale_vel;
   Eigen::Vector3f d_vel_;
@@ -324,11 +323,6 @@ Eigen::Vector3f calculateVelocityCommand(nav_msgs::Path& path_transf, Eigen::Vec
     path_point(1)=path_transf.poses[i_follow + 1].pose.position.y;
     path_point(2)=path_transf.poses[i_follow + 1].pose.position.z;
   
-
-    // Eigen::Vector4f target_ori=1;
-    // Eigen::Matrix3f pathRotMat=ori2rotmat;
-    // path_point=pathRotMat*path_point;
-
     dx = path_point(0) - real_pose_(0);
     dy = path_point(1) - real_pose_(1);
     dz = path_point(2) - real_pose_(2);
@@ -340,8 +334,13 @@ Eigen::Vector3f calculateVelocityCommand(nav_msgs::Path& path_transf, Eigen::Vec
     d_vel_(1)=dy*scale_vel;
     d_vel_(2)=dz*scale_vel;
 
-    // std::cerr<<"std::sqrt((path_point - real_pose_).norm()): "<<std::sqrt((path_point - real_pose_).norm())<< std::endl;
-    if (std::sqrt((path_point - real_pose_).norm())<=tol)
+    if (i_follow!=0)
+    {
+      target_pose_+=d_vel_*dt_;
+    }
+
+    std::cerr<<"std::sqrt((path_point - real_pose_).norm()): "<<std::sqrt((path_point - real_pose_).norm())<< std::endl;
+    if (std::sqrt((path_point - target_pose_).norm())<=tol)
     {
       i_follow+=1;
     }
@@ -363,21 +362,14 @@ Eigen::Vector3f calculateVelocityCommand(nav_msgs::Path& path_transf, Eigen::Vec
     d_vel_(0)=dx*scale_vel;
     d_vel_(1)=dy*scale_vel;
     d_vel_(2)=dz*scale_vel;
-    vd(0) = 0;
-    vd(1) = 0;
-    vd(2) = 0;
+    if (i_follow!=0)
+    {
+      target_pose_+=d_vel_*dt_;
+    }
   }
 
-  if (i_follow!=0)
-  {
-    target_pose_+=d_vel_*dt_;
-    // std::cerr<<"target_pose_+=d_vel_*dt_: "<< target_pose_(0) <<","<< target_pose_(1) <<","<< target_pose_(2) <<"," << std::endl;
-    // std::cerr<<"d_vel_*dt_: "<< d_vel_*dt_ << std::endl;
-    // std::cerr<<"dt_: "<< dt_ << std::endl;
-  }
-  
 
-  
+
   if (vd.norm() > Velocity_limit_) {
     vd = vd / vd.norm() * Velocity_limit_;
       ROS_WARN_STREAM_THROTTLE(1.5, "TOO FAST");
@@ -395,8 +387,8 @@ Eigen::Vector3f calculateVelocityCommand(nav_msgs::Path& path_transf, Eigen::Vec
   // std::cerr<<"desired_ori_: "<< desired_ori_(0) <<","<< desired_ori_(1) <<","<< desired_ori_(2) <<","<< desired_ori_(3) <<"," << std::endl;
   // std::cerr<<"target_pose_: "<< target_pose_(0) <<","<< target_pose_(1) <<","<< target_pose_(2) <<"," << std::endl;
 
-  //return vd;
-  return d_vel_;
+  return vd;
+  //return d_vel_;
 }
 
 
@@ -581,8 +573,12 @@ int main(int argc, char** argv)
       desired_ori_velocity_filtered_(3)=pathplanning.quat_obj(3);
       double new_rad;
       n.getParam("new_rad", new_rad);
+      double flow_radius;
+      n.getParam("flow_radius", flow_radius);
 
-      desired_vel_filtered_=calculateVelocityCommand(path_transformed, real_pose_,desired_ori_velocity_filtered_, new_rad);
+      double rad_up =new_rad -flow_radius;
+
+      desired_vel_filtered_=calculateVelocityCommand(path_transformed, real_pose_,desired_ori_velocity_filtered_, rad_up);
       //ROS_INFO_STREAM("desired_vel_filtered_: " << desired_vel_filtered_ );
       msg_desired_vel_filtered_.position.x  = desired_vel_filtered_(0);
       msg_desired_vel_filtered_.position.y  = desired_vel_filtered_(1);
@@ -654,7 +650,7 @@ void updateLimitCycle3DPosVel_with2DLC(Eigen::Vector3f pose, Eigen::Vector3f tar
 {
 	double Convergence_Rate_LC_=10;
 	double Cycle_radius_LC_=radius;//0.015;
-	double Cycle_speed_LC_=8;
+	double Cycle_speed_LC_=3.14;
 	float a[2] = {1., 1.};
 	float norm_a=std::sqrt(a[0]*a[0]+a[1]*a[1]);
 	for (int i=0; i<2; i++)

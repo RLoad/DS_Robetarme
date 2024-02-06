@@ -1,14 +1,14 @@
 <launch>
     <!-- Launch the first launch file -->
 
-    <param name="optimum_radius" type="double" value="0.01"/>
-    <param name="height_target" type="double" value="0.32"/>
-    <param name="width_target" type="double" value="0.25"/>
 
+     <!-- sum of the radius of the limit cycle plus the radius of the flow -->
+     <!-- limit cycle is 0.03 and flow is 0.05 == 0.08 -->
+    <param name="limit_cycle_radius" type="double" value="0.03"/> 
+    <param name="flow_radius" type="double" value="0.03"/> 
+
+    <param name="height_target" type="double" value="0.4"/>
+    <param name="width_target" type="double" value="0.4"/>
+    <include file="$(find boustrophedon_server)/launch/boustrophedon_server.launch"/>
     <include file="$(find test_boustrophedon_with_robot)/launch/path_planning_wo_server.launch"/>
-
-    <!-- Launch the second launch file with required arguments -->
-    <include file="$(find boustrophedon_server)/launch/boustrophedon_server.launch">
-        <param name="stripe_separation" value="$(arg optimum_radius)"/>
-    </include>
 </launch>
