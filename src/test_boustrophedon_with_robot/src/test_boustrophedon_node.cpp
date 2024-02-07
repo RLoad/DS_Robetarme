@@ -59,6 +59,7 @@ class PathPlanning {       // The class
         std::cout << "Valeur réelle de z en  : " << optimum_radius << std::endl;
         // Publish z_actual_height and z_actual_width as ROS parameters
         n.setParam("/boustrophedon_server/stripe_separation", 2*optimum_radius);
+        n.setParam("optimum_radius", optimum_radius);
 
     }
 
@@ -251,7 +252,8 @@ Eigen::Vector4f desired_ori_velocity_filtered_;
 Eigen::Vector3f vd;
 
 double Velocity_limit_=0.5;
-
+bool finish =false;
+ 
 
 //----------------define all function-------------------------------------
 // server has a service to convert StripingPlan to Path, but all it does it call this method
@@ -307,10 +309,10 @@ bool convertStripingPlanToPath(const boustrophedon_msgs::StripingPlan& striping_
 // this function take the path comoute from server and create a linear DS
 //when the eef is close the the next point it change the goal until the last point of the path
 Eigen::Vector3f calculateVelocityCommand(nav_msgs::Path& path_transf, Eigen::Vector3f real_pose_,Eigen::Vector4f desired_ori_,double radius)
-{
-  double tol = 0.05;
+{ 
+  double tol = 0.15;
   double dx,dy,dz;
-  double desired_vel=0.02;
+  double desired_vel=0.03;
   double norm;
   double scale_vel;
   Eigen::Vector3f d_vel_;
@@ -338,6 +340,7 @@ Eigen::Vector3f calculateVelocityCommand(nav_msgs::Path& path_transf, Eigen::Vec
     {
       target_pose_+=d_vel_*dt_;
     }
+    std::cerr<<"i_follow: "<<i_follow<< std::endl;
 
     std::cerr<<"std::sqrt((path_point - real_pose_).norm()): "<<std::sqrt((path_point - real_pose_).norm())<< std::endl;
     if (std::sqrt((path_point - target_pose_).norm())<=tol)
@@ -359,16 +362,15 @@ Eigen::Vector3f calculateVelocityCommand(nav_msgs::Path& path_transf, Eigen::Vec
     norm = sqrt(dx*dx+dy*dy+dz*dz);
     scale_vel = desired_vel/norm;
 
-    d_vel_(0)=dx*scale_vel;
-    d_vel_(1)=dy*scale_vel;
-    d_vel_(2)=dz*scale_vel;
-    if (i_follow!=0)
-    {
-      target_pose_+=d_vel_*dt_;
-    }
+    d_vel_(0)=0;
+    d_vel_(1)=0;
+    d_vel_(2)=0;
+    vd(0)=0;
+    vd(1)=0;
+    vd(2)=0;
+    finish =true;
+ 
   }
-
-
 
   if (vd.norm() > Velocity_limit_) {
     vd = vd / vd.norm() * Velocity_limit_;
@@ -387,6 +389,7 @@ Eigen::Vector3f calculateVelocityCommand(nav_msgs::Path& path_transf, Eigen::Vec
   // std::cerr<<"desired_ori_: "<< desired_ori_(0) <<","<< desired_ori_(1) <<","<< desired_ori_(2) <<","<< desired_ori_(3) <<"," << std::endl;
   // std::cerr<<"target_pose_: "<< target_pose_(0) <<","<< target_pose_(1) <<","<< target_pose_(2) <<"," << std::endl;
 
+  
   return vd;
   //return d_vel_;
 }
@@ -472,7 +475,7 @@ int main(int argc, char** argv)
     ros::Rate loop_rate(fs);
 
     ROS_INFO("Waiting for action server to start.");
-    // wait for the action server to start
+    // wait for the action server to startnew_rad
     client.waitForServer();  // will wait for infinite time
 
     ROS_INFO("Action server started");
@@ -485,6 +488,8 @@ int main(int argc, char** argv)
     ROS_INFO_STREAM("Waiting for goal");
     pathplanning.publishInitialPose();
     nav_msgs::Path path;
+    n.setParam("/startDS", false);
+    n.setParam("/finishDS", false);
 
     // extract initial_pose from optitrack center of marker
     while (ros::ok())
@@ -521,6 +526,11 @@ int main(int argc, char** argv)
       loop_rate.sleep();
     }
 
+    n.setParam("/startDS", true);
+
+
+    bool startController;
+    n.getParam("/startController", startController);
 
     while (ros::ok())
     {
@@ -534,12 +544,12 @@ int main(int argc, char** argv)
 
       ros::Time end_time = ros::Time::now();
       ros::Duration elapsed_time = end_time - start_time;
-      //ROS_INFO_STREAM("Time elapsed: " << elapsed_time.toSec() << " seconds");
+ 
+      double rad_up;
 
-      // ROS_INFO_STREAM("real_pose_: " << real_pose_ );
-
-      if (i_follow==0)
+      if (startController == false)
       {
+        
         target_pose_(0)=path_transformed.poses[0].pose.position.x;
         target_pose_(1)=path_transformed.poses[0].pose.position.y;
         target_pose_(2)=path_transformed.poses[0].pose.position.z;
@@ -552,10 +562,9 @@ int main(int argc, char** argv)
         _wRb = quaternionToRotationMatrix(Quat4f);
         Eigen::Quaterniond quaternion(pathplanning.quat_obj(3),pathplanning.quat_obj(0),pathplanning.quat_obj(1),pathplanning.quat_obj(2));
         Eigen::Matrix3d rotationMatrix = quaternion.toRotationMatrix();
-        Eigen::Vector3d target_pose_3d(target_pose_(0), target_pose_(1), target_pose_(2));
+
+        Eigen::Vector3d target_pose_3d(target_pose_(0), target_pose_(1), target_pose_(2)); // for first position
         Eigen::Vector3d parameter_pos3f = target_pose_3d- _toolOffsetFromEE*rotationMatrix.col(2);
-        // Eigen::Vector3f parameter_pos3f = target_pose_ - _toolOffsetFromEE*_wRb.col(2);
-        
         std::vector<double> parameter_pos;
         parameter_pos.reserve(parameter_pos3f.size());  // Reserve space for efficiency
 
@@ -563,37 +572,54 @@ int main(int argc, char** argv)
             parameter_pos.push_back(static_cast<double>(parameter_pos3f[i]));
         }
         n.setParam("/initialPos", parameter_pos);
+  
+       Eigen::Vector3d target_pose_3d_final(pathplanning.pos_obj(0),pathplanning.pos_obj(1),pathplanning.pos_obj(2)); // for first position
+        Eigen::Vector3d parameter_pos3f_final = target_pose_3d_final- _toolOffsetFromEE*rotationMatrix.col(2);
+        std::vector<double> parameter_pos_final;
+        parameter_pos_final.reserve(parameter_pos3f_final.size());  // Reserve space for efficiency
+
+        for (int i = 0; i < parameter_pos3f_final.size(); ++i) {
+            parameter_pos_final.push_back(static_cast<double>(parameter_pos3f_final[i]));
+        }
+        n.setParam("/finalPos", parameter_pos_final);
+
+              //--- here waiting for orinetation control
+        desired_ori_velocity_filtered_(0)=pathplanning.quat_obj(0);
+        desired_ori_velocity_filtered_(1)=pathplanning.quat_obj(1);
+        desired_ori_velocity_filtered_(2)=pathplanning.quat_obj(2);
+        desired_ori_velocity_filtered_(3)=pathplanning.quat_obj(3);
+        double optimum_radius;
+        n.getParam("optimum_radius", optimum_radius);
+        double flow_radius;
+        n.getParam("flow_radius", flow_radius);
+
+        rad_up = optimum_radius -flow_radius;
+        n.getParam("/startController", startController);
+
       }
-      
-
-      //--- here waiting for orinetation control
-      desired_ori_velocity_filtered_(0)=pathplanning.quat_obj(0);
-      desired_ori_velocity_filtered_(1)=pathplanning.quat_obj(1);
-      desired_ori_velocity_filtered_(2)=pathplanning.quat_obj(2);
-      desired_ori_velocity_filtered_(3)=pathplanning.quat_obj(3);
-      double new_rad;
-      n.getParam("new_rad", new_rad);
-      double flow_radius;
-      n.getParam("flow_radius", flow_radius);
-
-      double rad_up =new_rad -flow_radius;
-
-      desired_vel_filtered_=calculateVelocityCommand(path_transformed, real_pose_,desired_ori_velocity_filtered_, rad_up);
-      //ROS_INFO_STREAM("desired_vel_filtered_: " << desired_vel_filtered_ );
-      msg_desired_vel_filtered_.position.x  = desired_vel_filtered_(0);
-      msg_desired_vel_filtered_.position.y  = desired_vel_filtered_(1);
-      msg_desired_vel_filtered_.position.z  = desired_vel_filtered_(2);
-      msg_desired_vel_filtered_.orientation.x = desired_ori_velocity_filtered_(0);
-      msg_desired_vel_filtered_.orientation.y = desired_ori_velocity_filtered_(1);  
-      msg_desired_vel_filtered_.orientation.z = desired_ori_velocity_filtered_(2);  
-      msg_desired_vel_filtered_.orientation.w = desired_ori_velocity_filtered_(3);  
-      pub_desired_vel_filtered_.publish(msg_desired_vel_filtered_);
-      
+      else{
+        desired_vel_filtered_=calculateVelocityCommand(path_transformed, real_pose_,desired_ori_velocity_filtered_, rad_up);
+        //ROS_INFO_STREAM("desired_vel_filtered_: " << desired_vel_filtered_ );
+        msg_desired_vel_filtered_.position.x  = desired_vel_filtered_(0);
+        msg_desired_vel_filtered_.position.y  = desired_vel_filtered_(1);
+        msg_desired_vel_filtered_.position.z  = desired_vel_filtered_(2);
+        msg_desired_vel_filtered_.orientation.x = desired_ori_velocity_filtered_(0);
+        msg_desired_vel_filtered_.orientation.y = desired_ori_velocity_filtered_(1);  
+        msg_desired_vel_filtered_.orientation.z = desired_ori_velocity_filtered_(2);  
+        msg_desired_vel_filtered_.orientation.w = desired_ori_velocity_filtered_(3);  
+        pub_desired_vel_filtered_.publish(msg_desired_vel_filtered_);
+      }
+      if (finish == true){
+        n.setParam("/finishDS", true);
+        break;
+      }
 
       ros::spinOnce();
       loop_rate.sleep();
 
     } 
+    n.setParam("/startDS", false);
+
     return 0;
 }
 
@@ -650,7 +676,7 @@ void updateLimitCycle3DPosVel_with2DLC(Eigen::Vector3f pose, Eigen::Vector3f tar
 {
 	double Convergence_Rate_LC_=10;
 	double Cycle_radius_LC_=radius;//0.015;
-	double Cycle_speed_LC_=3.14;
+	double Cycle_speed_LC_=2* 3.14;
 	float a[2] = {1., 1.};
 	float norm_a=std::sqrt(a[0]*a[0]+a[1]*a[1]);
 	for (int i=0; i<2; i++)
