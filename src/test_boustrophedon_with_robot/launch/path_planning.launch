@@ -5,10 +5,10 @@
      <!-- sum of the radius of the limit cycle plus the radius of the flow -->
      <!-- limit cycle is 0.03 and flow is 0.05 == 0.08 -->
     <param name="limit_cycle_radius" type="double" value="0.03"/> 
-    <param name="flow_radius" type="double" value="0.03"/> 
+    <param name="flow_radius" type="double" value="0.032"/> 
 
     <param name="height_target" type="double" value="0.4"/>
-    <param name="width_target" type="double" value="0.4"/>
+    <param name="width_target" type="double" value="0.6"/>
     <include file="$(find boustrophedon_server)/launch/boustrophedon_server.launch"/>
     <include file="$(find test_boustrophedon_with_robot)/launch/path_planning_wo_server.launch"/>
 </launch>

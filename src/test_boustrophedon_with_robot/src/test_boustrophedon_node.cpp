@@ -233,7 +233,7 @@ Eigen::Vector4f real_pose_ori_;
 Eigen::Matrix3f _wRb;				// Current rotation matrix [m] (3x1)
 Eigen::Vector3f _x;				// Current position [m] (3x1)
 Eigen::Vector4f _q;				// Current end effector quaternion (4x1)  
-double _toolOffsetFromEE= 0.25f;//---- knife tool with f/t sensor
+double _toolOffsetFromEE= 0.55f;//---- knife tool with f/t sensor
 bool _firstRealPoseReceived;
 
 Eigen::Vector3f desired_vel_;
@@ -340,9 +340,8 @@ Eigen::Vector3f calculateVelocityCommand(nav_msgs::Path& path_transf, Eigen::Vec
     {
       target_pose_+=d_vel_*dt_;
     }
-    std::cerr<<"i_follow: "<<i_follow<< std::endl;
 
-    std::cerr<<"std::sqrt((path_point - real_pose_).norm()): "<<std::sqrt((path_point - real_pose_).norm())<< std::endl;
+    std::cerr<<"target number: "<<i_follow<< std::endl;
     if (std::sqrt((path_point - target_pose_).norm())<=tol)
     {
       i_follow+=1;
