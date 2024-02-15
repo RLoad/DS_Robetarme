@@ -93,6 +93,7 @@ PathPlanner::PathPlanner(ros::NodeHandle& nh, Eigen::Quaterniond target_quat, Ei
 
     // Access parameters from the YAML file
     limit_cycle_radius = config["limit_cycle_radius"].as<double>();
+    toolOffsetFromTarget = config["toolOffsetFromTarget"].as<double>();
     flow_radius = config["flow_radius"].as<double>();
     sum_rad = flow_radius + limit_cycle_radius;
 
@@ -203,7 +204,7 @@ void PathPlanner::publishInitialPose() {
 }
   
 
-  nav_msgs::Path PathPlanner::get_transformed_path(const nav_msgs::Path& originalPath) {
+nav_msgs::Path PathPlanner::get_transformed_path(const nav_msgs::Path& originalPath) {
     nav_msgs::Path transformedPath;
     Eigen::Affine3d transformation = Eigen::Translation3d(targetPos(0),targetPos(1),targetPos(2)) * targetQuat;
 
@@ -237,20 +238,77 @@ void PathPlanner::publishInitialPose() {
         transformedPath.poses.push_back(transformedPose);
       }
     return transformedPath;
-  }
+}
 
-  void PathPlanner::see_target_flat(){
+void PathPlanner::see_target_flat(){
 
-      geometry_msgs::PolygonStamped visualpolygonTarget;
-      visualpolygonTarget.header.frame_id = "base";  
-      visualpolygonTarget.header.stamp = ros::Time::now();
+    geometry_msgs::PolygonStamped visualpolygonTarget;
+    visualpolygonTarget.header.frame_id = "base";  
+    visualpolygonTarget.header.stamp = ros::Time::now();
 
-      for (const auto& point : flatPolygons) {
-          geometry_msgs::Point32 msg_point;
-          msg_point.x = point.x();
-          msg_point.y = point.y();
-          msg_point.z = point.z();
-          visualpolygonTarget.polygon.points.push_back(msg_point);
-      }
-      transformedPolygonPub.publish(visualpolygonTarget);
-  }
+    for (const auto& point : flatPolygons) {
+        geometry_msgs::Point32 msg_point;
+        msg_point.x = point.x();
+        msg_point.y = point.y();
+        msg_point.z = point.z();
+        visualpolygonTarget.polygon.points.push_back(msg_point);
+    }
+    transformedPolygonPub.publish(visualpolygonTarget);
+}
+
+void PathPlanner::set_strategique_position(ros::NodeHandle& nh){
+    //taking the first point of the path
+    limitcycle.target_pose_(0)=path_transformed.poses[0].pose.position.x;
+    limitcycle.target_pose_(1)=path_transformed.poses[0].pose.position.y;
+    limitcycle.target_pose_(2)=path_transformed.poses[0].pose.position.z;
+    
+    // Set values for a initial orientation
+    std::vector<double> parameter_quat = {targetQuat.x(),targetQuat.y(),targetQuat.z(),targetQuat.w()};
+    nh.setParam("/initialQuat", parameter_quat);
+
+    Eigen::Vector4f Quat4f = targetQuat.cast<float>();
+    Eigen::Matrix3d rotationMatrix = targetQuat.toRotationMatrix();
+
+    Eigen::Vector3d parameter_pos3f = targetPos - toolOffsetFromTarget  *  rotationMatrix.col(2);
+    
+    std::vector<double> parameter_pos;
+    parameter_pos.reserve(parameter_pos3f.size());  // Reserve space for efficiency
+    for (int i = 0; i < parameter_pos3f.size(); ++i) {
+        parameter_pos.push_back(static_cast<double>(parameter_pos3f[i]));
+    }
+    n.setParam("/initialPos", parameter_pos);
+    n.setParam("/finalPos", parameter_pos);
+
+    //--- here waiting for orinetation control
+    limitcycle.desired_ori_velocity_filtered_(0)=pathplanning.quat_obj(0);
+    limitcycle.desired_ori_velocity_filtered_(1)=pathplanning.quat_obj(1);
+    limitcycle.desired_ori_velocity_filtered_(2)=pathplanning.quat_obj(2);
+    limitcycle.desired_ori_velocity_filtered_(3)=pathplanning.quat_obj(3);
+    double optimum_radius;
+    n.getParam("optimum_radius", optimum_radius);
+    double flow_radius;
+    n.getParam("flow_radius", flow_radius);
+
+    rad_up = optimum_radius -flow_radius;
+    n.getParam("/startController", startController);
+
+}
+
+
+
+DynamicalSystem::DynamicalSystem(ros::NodeHandle& nh)
+{
+
+    // Get the path to the package
+    std::string package_path = ros::package::getPath("motion_planner"); // Replace "your_package" with your actual package name
+    // Load parameters from YAML file
+    std::string yaml_path = package_path + "/config/config.yaml";
+    YAML::Node config = YAML::LoadFile(yaml_path);
+
+    // Access parameters from the YAML file
+    limit_cycle_radius = config["limit_cycle_radius"].as<double>();
+    toolOffsetFromTarget = config["toolOffsetFromTarget"].as<double>();
+    flow_radius = config["flow_radius"].as<double>();
+    sum_rad = flow_radius + limit_cycle_radius;
+
+}

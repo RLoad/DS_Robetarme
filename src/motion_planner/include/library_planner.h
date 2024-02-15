@@ -37,10 +37,8 @@ private:
 class PathPlanner {
 public:
     std::vector<double> FirstPos;
-    double flow_radius, limit_cycle_radius, sum_rad, optimum_radius;
     geometry_msgs::PoseStamped msgP;
     std::string name_base;
-
     PathPlanner(ros::NodeHandle& nh, Eigen::Quaterniond target_quat, Eigen::Vector3d target_pos, std::vector<Eigen::Vector3d> polygons_positions);
     std::vector<Eigen::Vector3d> get_planner_points();
     boustrophedon_msgs::PlanMowingPathGoal  ComputeGoal();
@@ -51,12 +49,14 @@ public:
 
 
 private:
+    double flow_radius, limit_cycle_radius, sum_rad, optimum_radius;
     ros::Publisher initialPosePub_;
     ros::Publisher transformedPolygonPub;
     std::vector<Eigen::Vector3d> polygonsPositions;
     std::vector<Eigen::Vector3d> flatPolygons;
     Eigen::Quaterniond targetQuat;
     Eigen::Vector3d targetPos;
+    double toolOffsetFromTarget;
 };
 
 class DynamicalSystem {
@@ -64,6 +64,7 @@ public:
     DynamicalSystem(ros::NodeHandle& nh);
     
 private:
+    double flow_radius, limit_cycle_radius, sum_rad, optimum_radius;
     bool targetReceived = false;
     double height_target, width_target;
     Eigen::Quaterniond targetQuat;

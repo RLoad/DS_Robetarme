@@ -20,204 +20,6 @@
 #include <cmath>
 #include "library_planner.h"
 
-class PathPlanning {       // The class
-  public:             // Access specifier
-    std::vector<double> FirstPos;
-    Eigen::Vector3d pos_obj;
-    Eigen::Vector4d quat_obj;
-    double height_target, width_target, flow_radius, limit_cycle_radius ,sum_rad, optimum_radius;
-    std::vector<double> p1,p2,p3,p4;
-    geometry_msgs::PoseStamped msgP;
-    std::string name_base;
-    PathPlanning(ros::NodeHandle& nh) {
-        // Subscribe to the PoseStamped topic
-        pose_subscriber_ = nh.subscribe("/vrpn_client_node/TargetRobetarme/pose_transform", 10, &PathPlanning::CC_vrpn_obj, this);
-        initialPosePub_ = nh.advertise<geometry_msgs::PoseWithCovarianceStamped>("/initialpose", 10);
-        nh.getParam("/optitrack_publisher/name_base_optitrack", name_base);
-        transformedPolygon_ = nh.advertise<geometry_msgs::PolygonStamped>("/transformed_polygon", 1, true);
-        parameter_initialization(nh);
-    }
-
-    void CC_vrpn_obj(const geometry_msgs::PoseStamped::ConstPtr msg) {  // Method/function defined inside the class
-        pos_obj    = {msg->pose.position.x,msg->pose.position.y,msg->pose.position.z};
-        quat_obj   = {msg->pose.orientation.x,msg->pose.orientation.y,msg->pose.orientation.z,msg->pose.orientation.w};
-    } 
-
-    void parameter_initialization(ros::NodeHandle& n) {
-        // Retrieve parameters from ROS Parameter Server
-        n.getParam("height_target", height_target);
-        n.getParam("width_target", width_target);
-        n.getParam("limit_cycle_radius", limit_cycle_radius);
-        n.getParam("flow_radius", flow_radius);
-        sum_rad = flow_radius + limit_cycle_radius;
-        optimization_parameter(n);
-    }
-
-    void optimization_parameter(ros::NodeHandle& n) {
-        // found a geometrical optimum to cross the target by S-shape
-        int sections_height = std::round(height_target / sum_rad);
-        int sections_width = std::round(width_target / sum_rad);
-        optimum_radius = (height_target / sections_height + width_target / sections_width) / 2.0;
-
-        // std::cout << "Nombre de sections en hauteur : " << sections_height << std::endl;
-        // std::cout << "Nombre de sections en largeur : " << sections_width << std::endl;
-        // std::cout << "Valeur réelle de z en  : " << optimum_radius << std::endl;
-        // Publish z_actual_height and z_actual_width as ROS parameters
-        n.setParam("/boustrophedon_server/stripe_separation", 2*optimum_radius);
-        n.setParam("optimum_radius", optimum_radius);
-
-    }
-
-    boustrophedon_msgs::PlanMowingPathGoal  ComputeGoal() {
-
-
-        // for reduced target
-      double x = (width_target-2*optimum_radius)/2;
-      double y = (height_target-2*optimum_radius)/2;
-      
-      p1 = {pos_obj(0)+x, pos_obj(1)+y,pos_obj(2)};
-      p2 = {pos_obj(0)-x, pos_obj(1)+y,pos_obj(2)};
-      p3 = {pos_obj(0)-x, pos_obj(1)-y,pos_obj(2)};
-      p4 = {pos_obj(0)+x, pos_obj(1)-y,pos_obj(2)};
-      name_base = "base";
-
-
-      //polygon for the server
-      boustrophedon_msgs::PlanMowingPathGoal goal;
-
-      goal.property.header.stamp = ros::Time::now();
-      goal.property.header.frame_id = name_base;
-      goal.property.polygon.points.resize(4);
-      goal.property.polygon.points[0].x = p1[0];
-      goal.property.polygon.points[0].y = p1[1];
-      goal.property.polygon.points[0].z = p1[2];
-      goal.property.polygon.points[1].x = p2[0];
-      goal.property.polygon.points[1].y = p2[1];
-      goal.property.polygon.points[1].z = p2[2];           
-      goal.property.polygon.points[2].x = p3[0];
-      goal.property.polygon.points[2].y = p3[1];
-      goal.property.polygon.points[2].z = p3[2];
-      goal.property.polygon.points[3].x = p4[0];
-      goal.property.polygon.points[3].y = p4[1];
-      goal.property.polygon.points[3].z = p4[2];
-
-      goal.robot_position.pose.orientation.x = 0.0;
-      goal.robot_position.pose.orientation.y = 0.0;
-      goal.robot_position.pose.orientation.z = 0.0;
-      goal.robot_position.pose.orientation.w = 1.0;
-
-
-      //for real target
-      x = (width_target)/2;
-      y = (height_target)/2;
-      
-      p1 = {pos_obj(0)+x, pos_obj(1)+y,pos_obj(2)};
-      p2 = {pos_obj(0)-x, pos_obj(1)+y,pos_obj(2)};
-      p3 = {pos_obj(0)-x, pos_obj(1)-y,pos_obj(2)};
-      p4 = {pos_obj(0)+x, pos_obj(1)-y,pos_obj(2)};
-
-    return goal;
-  }
-  void visualTarget(){
-
-      //polygon for the visualiton on the target
-      Eigen::Affine3d transformation = Eigen::Translation3d(pos_obj(0),pos_obj(1),pos_obj(2)) * Eigen::Quaterniond(quat_obj(3),quat_obj(0),quat_obj(1),quat_obj(2));
-      Eigen::Vector3d point1(p1[0],p1[1],p1[2]);
-      Eigen::Vector3d point2(p2[0],p2[1],p2[2]);
-      Eigen::Vector3d point3(p3[0],p3[1],p3[2]);
-      Eigen::Vector3d point4(p4[0],p4[1],p4[2]);
-      // Transform each point
-      Eigen::Vector3d transformedPoint1 = transformation * point1;
-      Eigen::Vector3d transformedPoint2 = transformation * point2;
-      Eigen::Vector3d transformedPoint3 = transformation * point3;
-      Eigen::Vector3d transformedPoint4 = transformation * point4;
-
-    
-      geometry_msgs::PolygonStamped visualpolygonTarget;
-      std::vector<Eigen::Vector3d> polygonPoints = {transformedPoint1, transformedPoint2, transformedPoint3, transformedPoint4};
-      visualpolygonTarget.header.frame_id = "base";  
-      visualpolygonTarget.header.stamp = ros::Time::now();
-
-      for (const auto& point : polygonPoints) {
-          geometry_msgs::Point32 msg_point;
-          msg_point.x = point.x();
-          msg_point.y = point.y();
-          msg_point.z = point.z();
-          visualpolygonTarget.polygon.points.push_back(msg_point);
-      }
-      transformedPolygon_.publish(visualpolygonTarget);
-  }
-
-  void publishInitialPose() {
-
-      double delta = 0.3;
-      // Create a publisher for the /initialpose topic
-
-      // Create and fill the message
-      geometry_msgs::PoseWithCovarianceStamped initialPoseMsg;
-      initialPoseMsg.header.seq = 0;
-      initialPoseMsg.header.stamp = ros::Time(0);
-      initialPoseMsg.header.frame_id = name_base;
-
-      initialPoseMsg.pose.pose.position.x = p2[0]- delta;
-      initialPoseMsg.pose.pose.position.y = p2[1]- delta;
-      initialPoseMsg.pose.pose.position.z = p2[2];
-
-      initialPoseMsg.pose.pose.orientation.x = 0.0;
-      initialPoseMsg.pose.pose.orientation.y = 0.0;
-      initialPoseMsg.pose.pose.orientation.z = 0.0;
-      initialPoseMsg.pose.pose.orientation.w = 1.0;
-
-      initialPoseMsg.pose.covariance.fill(0.0);  // Fill the covariance with zeros
-
-      initialPosePub_.publish(initialPoseMsg);
-      
-  }
-
-
-  nav_msgs::Path transformPath(const nav_msgs::Path& originalPath) {
-    nav_msgs::Path transformedPath;
-    Eigen::Affine3d transformation = Eigen::Translation3d(pos_obj(0),pos_obj(1),pos_obj(2)) * Eigen::Quaterniond(quat_obj(3),quat_obj(0),quat_obj(1),quat_obj(2));
-
-    transformedPath.header = originalPath.header;
-
-    for (const auto& pose : originalPath.poses) {
-        // Convert pose to Eigen types for transformation
-        Eigen::Vector3d originalPosition(pose.pose.position.x, pose.pose.position.y, pose.pose.position.z);
-        Eigen::Quaterniond originalOrientation(pose.pose.orientation.w, pose.pose.orientation.x,
-                                                pose.pose.orientation.y, pose.pose.orientation.z);
-
-        // Apply transformation
-        Eigen::Vector3d transformedPosition = transformation * originalPosition;
-        
-        // Convert the rotation matrix to a quaternion before applying the rotation
-        Eigen::Quaterniond transformedOrientation(transformation.rotation());
-        transformedOrientation = transformedOrientation * originalOrientation;
-
-        // Convert back to geometry_msgs types
-        geometry_msgs::PoseStamped transformedPose;
-        transformedPose.header = originalPath.header;
-        transformedPose.pose.position.x = transformedPosition.x();
-        transformedPose.pose.position.y = transformedPosition.y();
-        transformedPose.pose.position.z = transformedPosition.z();
-        transformedPose.pose.orientation.w = transformedOrientation.w();
-        transformedPose.pose.orientation.x = transformedOrientation.x();
-        transformedPose.pose.orientation.y = transformedOrientation.y();
-        transformedPose.pose.orientation.z = transformedOrientation.z();
-
-        // Add the transformed pose to the new path
-        transformedPath.poses.push_back(transformedPose);
-    }
-
-    return transformedPath;
-  }
-
-  private:
-    ros::Subscriber pose_subscriber_;
-    ros::Publisher initialPosePub_;
-    ros::Publisher transformedPolygon_;
-
-};
 
 
 class LimitCycle {  
@@ -557,7 +359,6 @@ int main(int argc, char** argv)
     Eigen::Quaterniond quatTarget = targetextraction.get_quat_target();
     Eigen::Vector3d posTarget = targetextraction.get_pos_target();
     
-    PathPlanning pathplanning(n);
     PathPlanner pathplanner(n, quatTarget, posTarget,polygons_positions);
 
     //frequency
@@ -640,11 +441,11 @@ int main(int argc, char** argv)
     { 
       ros::Time start_time = ros::Time::now();
       targetextraction.see_target();
+
       path_pub.publish(path_transformed);
     }
     while (ros::ok())
     {
-    std::cout << "HERE"<<std::endl;
 
       ros::Time start_time = ros::Time::now();
 
@@ -658,42 +459,14 @@ int main(int argc, char** argv)
 
       if (startController == false)
       {
-        
+        pathplanner.set_strategique_position(n);
+        //taking the first point of the path
         limitcycle.target_pose_(0)=path_transformed.poses[0].pose.position.x;
         limitcycle.target_pose_(1)=path_transformed.poses[0].pose.position.y;
         limitcycle.target_pose_(2)=path_transformed.poses[0].pose.position.z;
-        // Set values for a single ROS parameter
-        std::vector<double> parameter_quat = {pathplanner.targetQuat.x(),pathplanning.quat_obj(1),pathplanning.quat_obj(2),pathplanning.quat_obj(3)};
-        n.setParam("/initialQuat", parameter_quat);
-
-        Eigen::Vector4f Quat4f = pathplanning.quat_obj.cast<float>();
         
-        limitcycle._wRb = limitcycle.quaternionToRotationMatrix(Quat4f);
-        Eigen::Quaterniond quaternion(pathplanning.quat_obj(3),pathplanner.targetQuat.x(),pathplanning.quat_obj(1),pathplanning.quat_obj(2));
-        Eigen::Matrix3d rotationMatrix = quaternion.toRotationMatrix();
-
-        Eigen::Vector3d target_pose_3d(limitcycle.target_pose_(0), limitcycle.target_pose_(1), limitcycle.target_pose_(2)); // for first position
-        Eigen::Vector3d parameter_pos3f = target_pose_3d- limitcycle._toolOffsetFromEE*rotationMatrix.col(2);
-        std::vector<double> parameter_pos;
-        parameter_pos.reserve(parameter_pos3f.size());  // Reserve space for efficiency
-
-        for (int i = 0; i < parameter_pos3f.size(); ++i) {
-            parameter_pos.push_back(static_cast<double>(parameter_pos3f[i]));
-        }
-        n.setParam("/initialPos", parameter_pos);
-  
-         Eigen::Vector3d target_pose_3d_final(pathplanning.pos_obj(0),pathplanning.pos_obj(1),pathplanning.pos_obj(2)); // for first position
-        Eigen::Vector3d parameter_pos3f_final = target_pose_3d_final- limitcycle._toolOffsetFromEE*rotationMatrix.col(2);
-        std::vector<double> parameter_pos_final;
-        parameter_pos_final.reserve(parameter_pos3f_final.size());  // Reserve space for efficiency
-
-        for (int i = 0; i < parameter_pos3f_final.size(); ++i) {
-            parameter_pos_final.push_back(static_cast<double>(parameter_pos3f_final[i]));
-        }
-        n.setParam("/finalPos", parameter_pos_final);
-
               //--- here waiting for orinetation control
-        limitcycle.desired_ori_velocity_filtered_(0)=pathplanner.targetQuat.x();
+        limitcycle.desired_ori_velocity_filtered_(0)=pathplanning.quat_obj(0);
         limitcycle.desired_ori_velocity_filtered_(1)=pathplanning.quat_obj(1);
         limitcycle.desired_ori_velocity_filtered_(2)=pathplanning.quat_obj(2);
         limitcycle.desired_ori_velocity_filtered_(3)=pathplanning.quat_obj(3);
