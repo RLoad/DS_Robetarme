@@ -1,0 +1,5 @@
+width_target: 0.6
+height_target: 0.4
+flow_radius: 0.03
+limit_cycle_radius: 0.03
+name_robot: "ur5"

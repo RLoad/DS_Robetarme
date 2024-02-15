@@ -217,10 +217,10 @@ class PathPlanning {       // The class
 
 
 
-//------------- define all parameter----------------------------------------------------------------------
-geometry_msgs::Quaternion headingToQuaternion(double x, double y, double z);
-Eigen::Matrix3f quaternionToRotationMatrix(Eigen::Vector4f q);
-void updateLimitCycle3DPosVel_with2DLC(Eigen::Vector3f pose, Eigen::Vector3f target_pose_cricleDS,Eigen::Vector4f desired_ori_, double radius);
+// //------------- define all parameter----------------------------------------------------------------------
+// geometry_msgs::Quaternion headingToQuaternion(double x, double y, double z);
+// Eigen::Matrix3f quaternionToRotationMatrix(Eigen::Vector4f q);
+// void updateLimitCycle3DPosVel_with2DLC(Eigen::Vector3f pose, Eigen::Vector3f target_pose_cricleDS,Eigen::Vector4f desired_ori_, double radius);
 
 bool got_initial_pose = false;
 geometry_msgs::PoseStamped initial_pose;

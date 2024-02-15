@@ -114,15 +114,15 @@ if [ "${MODE}" != "connect" ]; then
     FWD_ARGS+=(--volume="boustrophedon_server:/home/ros/ros_ws/src/boustrophedon_server:rw")
 
     #Add volume test_boustrophedon_with_robot/
-    docker volume rm test_boustrophedon_with_robot
+    docker volume rm motion_planner
    
     docker volume create --driver local \
     --opt type="none" \
-    --opt device="${PWD}/../src/test_boustrophedon_with_robot" \
+    --opt device="${PWD}/../src/motion_planner" \
     --opt o="bind" \
-    "test_boustrophedon_with_robot"
+    "motion_planner"
 
-    FWD_ARGS+=(--volume="test_boustrophedon_with_robot:/home/ros/ros_ws/src/test_boustrophedon_with_robot:rw")
+    FWD_ARGS+=(--volume="motion_planner:/home/ros/ros_ws/src/motion_planner:rw")
     
 
    
