@@ -154,8 +154,8 @@ void PathPlanner::optimization_parameter(ros::NodeHandle& n) {
 void PathPlanner::publishInitialPose() {
     double maxZ = -std::numeric_limits<double>::infinity();
     std::vector<Eigen::Vector3d> highestZPoints;
-    std::size_t imax = 0
-    std::size_t i = 0
+    int imax = 0;
+    int i = 0;
 
     std::vector<Eigen::Vector3d> points = polygonsPositions;
     for (const auto& point : points) {
