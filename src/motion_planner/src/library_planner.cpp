@@ -400,7 +400,6 @@ geometry_msgs::Pose DynamicalSystem::get_ros_msg_vel()
 
 void DynamicalSystem::UpdateRealPosition(const geometry_msgs::Pose::ConstPtr& msg) {
 
-  got_initial_pose = true;
   Eigen::Vector4d real_pose_ori;
 
   msg_real_pose_ = *msg;
@@ -455,9 +454,9 @@ Eigen::Vector3d DynamicalSystem::get_DS_vel(nav_msgs::Path& path_transf,double r
     path_point(2)=path_transf.poses[i_follow + 1].pose.position.z;
     publishPointStamped(path_point);
   
-    dx = path_point(0) - real_pose_(0);
-    dy = path_point(1) - real_pose_(1);
-    dz = path_point(2) - real_pose_(2);
+    dx = path_point(0) - real_pose(0);
+    dy = path_point(1) - real_pose(1);
+    dz = path_point(2) - real_pose(2);
 
     norm = sqrt(dx*dx+dy*dy+dz*dz);
     scale_vel = linearVel/norm;
@@ -477,7 +476,7 @@ Eigen::Vector3d DynamicalSystem::get_DS_vel(nav_msgs::Path& path_transf,double r
     {
       i_follow+=1;
     }
-    updateLimitCycle3DPosVel_with2DLC(real_pose_,centerLimitCycle, radius );
+    updateLimitCycle3DPosVel_with2DLC(real_pose,centerLimitCycle, radius );
 
   }else
   {
@@ -485,9 +484,9 @@ Eigen::Vector3d DynamicalSystem::get_DS_vel(nav_msgs::Path& path_transf,double r
     path_point(1)=path_transf.poses[i_follow].pose.position.y;
     path_point(2)=path_transf.poses[i_follow].pose.position.z;
 
-    dx = path_point(2) - real_pose_(0);
-    dy = path_point(1) - real_pose_(1);
-    dz = path_point(0) - real_pose_(2);
+    dx = path_point(2) - real_pose(0);
+    dy = path_point(1) - real_pose(1);
+    dz = path_point(0) - real_pose(2);
 
     norm = sqrt(dx*dx+dy*dy+dz*dz);
     scale_vel = linearVel/norm;
