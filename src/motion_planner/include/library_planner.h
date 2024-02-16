@@ -42,9 +42,11 @@ public:
     double sum_rad;
     Eigen::Quaterniond targetQuat;
     Eigen::Vector3d targetPos;
-    geometry_msgs::PoseStamped msgP;
+    geometry_msgs::PoseStamped initial_pose;
     geometry_msgs::PoseWithCovarianceStamped initialPoseMsg;
+    
     PathPlanner(ros::NodeHandle& nh, Eigen::Quaterniond target_quat, Eigen::Vector3d target_pos, std::vector<Eigen::Vector3d> polygons_positions);
+    geometry_msgs::PoseStamped get_initial_pos_ros_msg();
     std::vector<Eigen::Vector3d> get_planner_points();
     boustrophedon_msgs::PlanMowingPathGoal  ComputeGoal();
     void optimization_parameter(ros::NodeHandle& n);

@@ -199,6 +199,43 @@ void PathPlanner::publishInitialPose() {
 
     initialPosePub_.publish(initialPoseMsg);
 }
+geometry_msgs::PoseStamped PathPlanner::get_initial_pos_ros_msg() {
+    double maxZ = -std::numeric_limits<double>::infinity();
+    std::vector<Eigen::Vector3d> highestZPoints;
+    
+    std::vector<Eigen::Vector3d> points = polygonsPositions;
+    for (const auto& point : points) {
+        if (point.z() > maxZ) {
+            maxZ = point.z();
+            highestZPoints.clear();  // Clear previous points with lower z
+            highestZPoints.push_back(point);
+        } else if (point.z() == maxZ) {
+            highestZPoints.push_back(point);
+        }
+    }
+
+   
+    Eigen::Vector3d pointInitial = highestZPoints[0];
+    double delta = 0.0;
+    // Create a publisher for the /initialpose topic
+
+    // Create and fill the message
+    initialPose.header.seq = 0;
+    initialPose.header.stamp = ros::Time(0);
+    initialPose.header.frame_id = "base";
+
+    initialPose.pose.pose.position.x = pointInitial(0)- delta;
+    initialPose.pose.pose.position.y = pointInitial(1)- delta;
+    initialPose.pose.pose.position.z = pointInitial(2);
+
+    initialPose.pose.pose.orientation.x = 0.0;
+    initialPose.pose.pose.orientation.y = 0.0;
+    initialPose.pose.pose.orientation.z = 0.0;
+    initialPose.pose.pose.orientation.w = 1.0;
+
+    initialPose.pose.covariance.fill(0.0);  // Fill the covariance with zeros
+    return initialPose;
+}
   
 
 nav_msgs::Path PathPlanner::get_transformed_path(const nav_msgs::Path& originalPath) {
