@@ -69,18 +69,8 @@ private:
 
 class DynamicalSystem {
 public:
-    bool got_initial_pose = false;
-    bool _firstRealPoseReceived;
     bool finish =false;
     double fs;
-
-    Eigen::Vector3d desired_vel;
-
-    std::size_t i_follow = 1;
-
-    Eigen::Vector3d centerLimitCycle;
-    Eigen::Vector4d desired_ori_velocity_filtered_;
-    Eigen::Vector3d vd;
 
     DynamicalSystem(ros::NodeHandle& nh);
     void parameter_initialization();
@@ -95,14 +85,21 @@ public:
 
 
 private:
+
+    bool _firstRealPoseReceived;
+    std::size_t i_follow = 1;
+
     geometry_msgs::PoseStamped initial_pose;
     geometry_msgs::Pose       msg_real_pose_;
     geometry_msgs::Twist msg_desired_vel_;
     geometry_msgs::Pose  msg_desired_vel_filtered_;
 
-    Eigen::Vector3d real_pose_, x;
-    Eigen::Vector4d real_pose_ori_;
-    Eigen::Quaterniond q;	
+    Eigen::Vector3d desired_vel;
+    Eigen::Vector3d real_pose;
+    Eigen::Quaterniond realQuat;	
+
+    Eigen::Vector3d centerLimitCycle;
+    Eigen::Vector4d desired_ori_velocity_filtered_;
     std::string robot_name;
 
     double flow_radius, limit_cycle_radius, sum_rad, toolOffsetFromTarget, dt, Velocity_limit;

@@ -401,33 +401,32 @@ geometry_msgs::Pose DynamicalSystem::get_ros_msg_vel()
 void DynamicalSystem::UpdateRealPosition(const geometry_msgs::Pose::ConstPtr& msg) {
 
   got_initial_pose = true;
+  Eigen::Vector4d real_pose_ori;
 
   msg_real_pose_ = *msg;
 
-  real_pose_(0) = msg_real_pose_.position.x;
-  real_pose_(1) = msg_real_pose_.position.y;
-  real_pose_(2) = msg_real_pose_.position.z;
+  real_pose(0) = msg_real_pose_.position.x;
+  real_pose(1) = msg_real_pose_.position.y;
+  real_pose(2) = msg_real_pose_.position.z;
 
-  real_pose_ori_(0) = msg_real_pose_.orientation.x;
-  real_pose_ori_(1) = msg_real_pose_.orientation.y;
-  real_pose_ori_(2) = msg_real_pose_.orientation.z;
-  real_pose_ori_(3) = msg_real_pose_.orientation.w;
+  real_pose_ori(0) = msg_real_pose_.orientation.x;
+  real_pose_ori(1) = msg_real_pose_.orientation.y;
+  real_pose_ori(2) = msg_real_pose_.orientation.z;
+  real_pose_ori(3) = msg_real_pose_.orientation.w;
 
   //---- Update end effector pose (position+orientation)
-  x << msg_real_pose_.position.x, msg_real_pose_.position.y, msg_real_pose_.position.z;
-  q= Eigen::Quaterniond(msg_real_pose_.orientation.w, msg_real_pose_.orientation.x, msg_real_pose_.orientation.y, msg_real_pose_.orientation.z);
+  realQuat = Eigen::Quaterniond(msg_real_pose_.orientation.w, msg_real_pose_.orientation.x, msg_real_pose_.orientation.y, msg_real_pose_.orientation.z);
 
-  Eigen::Quaterniond normalizedQuat = q.normalized();
+  Eigen::Quaterniond normalizedQuat = realQuat.normalized();
   Eigen::Matrix3d rotation_matrix = normalizedQuat.toRotationMatrix();
 
-  // _wRb = quaternionToRotationMatrix(_q);
 
-  x = x+toolOffsetFromTarget*rotation_matrix.col(2);
+  real_pose = real_pose + toolOffsetFromTarget*rotation_matrix.col(2);
   
-  for (size_t i = 0; i < 3; i++)
-  {
-    real_pose_(i)=x(i);
-  }
+  // for (size_t i = 0; i < 3; i++)
+  // {
+  //   real_pose_(i)=x(i);
+  // }
 
   if(!_firstRealPoseReceived)
   {
