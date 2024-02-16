@@ -135,30 +135,12 @@ int main(int argc, char** argv)
     {
       pathplanner.set_strategique_position(n);
       //taking the first point of the path
-      limitcycle.centerLimitCycle(0)=path_transformed.poses[0].pose.position.x;
-      limitcycle.centerLimitCycle(1)=path_transformed.poses[0].pose.position.y;
-      limitcycle.centerLimitCycle(2)=path_transformed.poses[0].pose.position.z;
-      
-            //--- here waiting for orinetation control
-      limitcycle.desired_ori_velocity_filtered_(0)=pathplanner.targetQuat.x();
-      limitcycle.desired_ori_velocity_filtered_(1)=pathplanner.targetQuat.y();
-      limitcycle.desired_ori_velocity_filtered_(2)=pathplanner.targetQuat.z();
-      limitcycle.desired_ori_velocity_filtered_(3)=pathplanner.targetQuat.w();
-
+      limitcycle.set_goal(path_transformed, pathplanner.targetQuat );
       n.getParam("/startController", startController);
-
     }
     else{
-      limitcycle.desired_vel_filtered_=limitcycle.calculateVelocityCommand(path_transforme, pathplanner.sum_rad);
-      //ROS_INFO_STREAM("desired_vel_filtered_: " << desired_vel_filtered_ );
-      limitcycle.msg_desired_vel_filtered_.position.x  = limitcycle.desired_vel_filtered_(0);
-      limitcycle.msg_desired_vel_filtered_.position.y  = limitcycle.desired_vel_filtered_(1);
-      limitcycle.msg_desired_vel_filtered_.position.z  = limitcycle.desired_vel_filtered_(2);
-      limitcycle.msg_desired_vel_filtered_.orientation.x = limitcycle.desired_ori_velocity_filtered_(0);
-      limitcycle.msg_desired_vel_filtered_.orientation.y = limitcycle.desired_ori_velocity_filtered_(1);  
-      limitcycle.msg_desired_vel_filtered_.orientation.z = limitcycle.desired_ori_velocity_filtered_(2);  
-      limitcycle.msg_desired_vel_filtered_.orientation.w = limitcycle.desired_ori_velocity_filtered_(3);  
-      pub_desired_vel_filtered_.publish(limitcycle.msg_desired_vel_filtered_);
+      limitcycle.get_DS_vel(path_transformed, pathplanner.sum_rad);      
+      pub_desired_vel_filtered_.publish(get_ros_msg_vel());
     }
     if (limitcycle.finish == true){
       n.setParam("/finishDS", true);

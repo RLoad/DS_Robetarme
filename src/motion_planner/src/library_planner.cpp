@@ -381,7 +381,29 @@ void DynamicalSystem::initialPoseCallback(const geometry_msgs::PoseWithCovarianc
   initial_pose.pose = init_pose->pose.pose;
   got_initial_pose = true;
 }
-
+void DynamicalSystem::set_goal(nav_msgs::Path path ,Eigen::Quaterniond quat)
+{
+  centerLimitCycle(0)=path.poses[0].pose.position.x;
+  centerLimitCycle(1)=path.poses[0].pose.position.y;
+  centerLimitCycle(2)=path.poses[0].pose.position.z;
+  
+        //--- here waiting for orinetation control
+  desired_ori_velocity_filtered_(0) = quat.x();
+  desired_ori_velocity_filtered_(1) = quat.y();
+  desired_ori_velocity_filtered_(2) = quat.z();
+  desired_ori_velocity_filtered_(3) = quat.w();
+}
+geometry_msgs::Pose DynamicalSystem::get_ros_msg_vel()
+{
+  msg_desired_vel_filtered_.position.x  = desired_vel_filtered_(0);
+  msg_desired_vel_filtered_.position.y  = desired_vel_filtered_(1);
+  msg_desired_vel_filtered_.position.z  = desired_vel_filtered_(2);
+  msg_desired_vel_filtered_.orientation.x = desired_ori_velocity_filtered_(0);
+  msg_desired_vel_filtered_.orientation.y = desired_ori_velocity_filtered_(1);  
+  msg_desired_vel_filtered_.orientation.z = desired_ori_velocity_filtered_(2);  
+  msg_desired_vel_filtered_.orientation.w = desired_ori_velocity_filtered_(3); 
+  return msg_desired_vel_filtered_;
+}
 
 void DynamicalSystem::UpdateRealPosition(const geometry_msgs::Pose::ConstPtr& msg) {
 
@@ -423,7 +445,7 @@ void DynamicalSystem::UpdateRealPosition(const geometry_msgs::Pose::ConstPtr& ms
    
     // this function take the path comoute from server and create a linear DS
     //when the eef is close the the next point it change the goal until the last point of the path
-Eigen::Vector3d DynamicalSystem::calculateVelocityCommand(nav_msgs::Path& path_transf,double radius)
+Eigen::Vector3d DynamicalSystem::get_DS_vel(nav_msgs::Path& path_transf,double radius)
 { 
   double tol = 0.2;
   double dx,dy,dz;

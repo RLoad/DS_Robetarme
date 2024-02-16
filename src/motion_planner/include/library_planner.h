@@ -84,8 +84,10 @@ public:
     DynamicalSystem(ros::NodeHandle& nh);
     void parameter_initialization();
     void initialPoseCallback(const geometry_msgs::PoseWithCovarianceStamped::ConstPtr& init_pose);
+    void set_goal(nav_msgs::Path path ,Eigen::Quaterniond quat);
+    geometry_msgs::Pose get_ros_msg_vel();
     void UpdateRealPosition(const geometry_msgs::Pose::ConstPtr& msg) ;
-    Eigen::Vector3d calculateVelocityCommand(nav_msgs::Path& path_transf, double radius);
+    Eigen::Vector3d get_DS_vel(nav_msgs::Path& path_transf, double radius);
     void publishPointStamped(const Eigen::Vector3d&  path_point );
     Eigen::Matrix3d quaternionToRotationMatrix(Eigen::Vector4d q);
     void updateLimitCycle3DPosVel_with2DLC(Eigen::Vector3d pose, Eigen::Vector3d target_pose_cricleDS, double radius);
