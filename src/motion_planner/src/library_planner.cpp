@@ -197,8 +197,8 @@ void PathPlanner::publishInitialPose() {
     initialPoseMsg.pose.covariance.fill(0.0);  // Fill the covariance with zeros
 
     initialPosePub_.publish(initialPoseMsg);
-    initialPos.header = initialPoseMsg.header;
-    initialPos.pose = initialPoseMsg.pose.pose;
+    initialPose.header = initialPoseMsg.header;
+    initialPose.pose = initialPoseMsg.pose.pose;
 }
 
   
@@ -389,7 +389,7 @@ void DynamicalSystem::set_goal(nav_msgs::Path path ,Eigen::Quaterniond quat)
 geometry_msgs::Pose DynamicalSystem::get_ros_msg_vel()
 {
   msg_desired_vel_filtered_.position.x  = desired_vel(0);
-  msg_desired_vel_filtered_.position.y  = desired_vel_(1);
+  msg_desired_vel_filtered_.position.y  = desired_vel(1);
   msg_desired_vel_filtered_.position.z  = desired_vel(2);
   msg_desired_vel_filtered_.orientation.x = desired_ori_velocity_filtered_(0);
   msg_desired_vel_filtered_.orientation.y = desired_ori_velocity_filtered_(1);  
@@ -491,7 +491,7 @@ Eigen::Vector3d DynamicalSystem::get_DS_vel(nav_msgs::Path& path_transf,double r
     dz = path_point(0) - real_pose_(2);
 
     norm = sqrt(dx*dx+dy*dy+dz*dz);
-    scale_vel = desired_vel/norm;
+    scale_vel = linearVel/norm;
 
     d_vel_(0)=0;
     d_vel_(1)=0;

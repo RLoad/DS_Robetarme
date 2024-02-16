@@ -42,7 +42,7 @@ public:
     double sum_rad;
     Eigen::Quaterniond targetQuat;
     Eigen::Vector3d targetPos;
-    geometry_msgs::PoseStamped initial_pose;
+    geometry_msgs::PoseStamped initialPose;
     geometry_msgs::PoseWithCovarianceStamped initialPoseMsg;
     
     PathPlanner(ros::NodeHandle& nh, Eigen::Quaterniond target_quat, Eigen::Vector3d target_pos, std::vector<Eigen::Vector3d> polygons_positions);
