@@ -359,9 +359,8 @@ DynamicalSystem::DynamicalSystem(ros::NodeHandle& n)
 
 void DynamicalSystem::parameter_initialization(){
   fs = 300;
-  dt_=1.0/fs;
-  Velocity_limit_=1.5;
-  _toolOffsetFromEE= 0.75f;//---- knife tool with f/t sensor
+  dt=1.0/fs;
+  Velocity_limit=1.5;
 
   // Get the path to the package
   std::string package_path = ros::package::getPath("motion_planner"); // Replace "your_package" with your actual package name
@@ -408,7 +407,7 @@ void DynamicalSystem::UpdateRealPosition(const geometry_msgs::Pose::ConstPtr& ms
 
   // _wRb = quaternionToRotationMatrix(_q);
 
-  x = x+_toolOffsetFromEE*rotation_matrix.col(2);
+  x = x+toolOffsetFromEE*rotation_matrix.col(2);
   
   for (size_t i = 0; i < 3; i++)
   {
@@ -455,7 +454,7 @@ Eigen::Vector3d DynamicalSystem::calculateVelocityCommand(nav_msgs::Path& path_t
 
     if (i_follow!=0)
     {
-      target_pose_+=d_vel_*dt_;
+      target_pose_+=d_vel_*dt;
     }
 
     std::cerr<<"target number: "<<i_follow<< std::endl;
@@ -489,8 +488,8 @@ Eigen::Vector3d DynamicalSystem::calculateVelocityCommand(nav_msgs::Path& path_t
 
   }
 
-  if (vd.norm() > Velocity_limit_) {
-    vd = vd / vd.norm() * Velocity_limit_;
+  if (vd.norm() > Velocity_limit) {
+    vd = vd / vd.norm() * Velocity_limit;
       ROS_WARN_STREAM_THROTTLE(1.5, "TOO FAST");
   }
   return vd;
