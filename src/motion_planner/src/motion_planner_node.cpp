@@ -21,41 +21,29 @@
 #include "library_planner.h"
 
 
-
-
 //----------------------- main loop ------------------------------------------------
 int main(int argc, char** argv) 
 {
+  double ros_freq = 300;
   ros::init(argc, argv, "motion_planner");
   ros::NodeHandle n;
-
   actionlib::SimpleActionClient<boustrophedon_msgs::PlanMowingPathAction> client("plan_path",true);  // server name and spin thread
   ros::Publisher polygon_pub = n.advertise<geometry_msgs::PolygonStamped>("/input_polygon", 1, true);
   ros::Publisher path_pub = n.advertise<nav_msgs::Path>("/result_path", 1, true);
   ros::Publisher start_pub = n.advertise<geometry_msgs::PoseStamped>("/start_pose", 1, true);
-
-  // Create an instance of PoseSubscriber
+  ros::Publisher pub_desired_vel_filtered_ = n.advertise<geometry_msgs::Pose>("/passive_control/vel_quat", 1);
+  ros::Rate loop_rate(ros_freq);
 
   TargetExtraction targetextraction(n);
   std::vector<Eigen::Vector3d> polygons_positions = targetextraction.get_polygons();
   Eigen::Quaterniond quatTarget = targetextraction.get_quat_target();
   Eigen::Vector3d posTarget = targetextraction.get_pos_target();
+
+  // get_polygons_optimzed()
+  // get corner_polygons()
   
   PathPlanner pathplanner(n, quatTarget, posTarget,polygons_positions);
-  DynamicalSystem limitcycle(n);
-  // Define the parameter name
-  std::string param_name = "robot";
-  // Declare a variable to store the parameter value
-  std::string robot_name;
-  // Try to get the parameter value
-  n.getParam(param_name, robot_name);
-
-  ros::Publisher pub_desired_vel_filtered_ = 
-      n.advertise<geometry_msgs::Pose>("/passive_control/vel_quat", 1);
-
-  ros::Rate loop_rate(limitcycle.fs);
-
-
+  DynamicalSystem limitcycle(n, ros_freq);
 
   ROS_INFO("Waiting for action server to start.");
   // wait for the action server to startnew_rad
@@ -64,13 +52,10 @@ int main(int argc, char** argv)
   ROS_INFO("Action server started");
 
   boustrophedon_msgs::PlanMowingPathGoal goal;
-  // goal = pathplanning.ComputeGoal();
   goal = pathplanner.ComputeGoal();
-
   polygon_pub.publish(goal.property);
 
   ROS_INFO_STREAM("Waiting for goal");
-  // pathplanning.publishInitialPose();
   pathplanner.publishInitialPose();
 
   nav_msgs::Path path;
@@ -83,9 +68,7 @@ int main(int argc, char** argv)
     ros::Time start_time = ros::Time::now();
 
     goal.robot_position = pathplanner.initialPose;
-
     start_pub.publish(goal.robot_position);
-
     client.sendGoal(goal);
     ROS_INFO_STREAM("Sending goal");
 

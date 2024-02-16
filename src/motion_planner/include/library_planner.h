@@ -71,9 +71,8 @@ private:
 class DynamicalSystem {
 public:
     bool finish =false;
-    double fs;
 
-    DynamicalSystem(ros::NodeHandle& nh);
+    DynamicalSystem(ros::NodeHandle& nh, double freq);
     void parameter_initialization();
     void initialPoseCallback(const geometry_msgs::PoseWithCovarianceStamped::ConstPtr& init_pose);
     void set_goal(nav_msgs::Path path ,Eigen::Quaterniond quat);
@@ -87,6 +86,7 @@ public:
     void set_tolerance_next_point(double tol);
 
 private:
+    double fs;
     double toleranceToNextPoint = 0.2;
     double linearVelExpected  = 0.04;
 

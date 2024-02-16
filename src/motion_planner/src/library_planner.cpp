@@ -154,19 +154,21 @@ void PathPlanner::optimization_parameter(ros::NodeHandle& n) {
 void PathPlanner::publishInitialPose() {
     double maxZ = -std::numeric_limits<double>::infinity();
     std::vector<Eigen::Vector3d> highestZPoints;
-    
+    std::size_t imax = 0
+    std::size_t i = 0
+
     std::vector<Eigen::Vector3d> points = polygonsPositions;
     for (const auto& point : points) {
-        if (point.z() > maxZ) {
-            maxZ = point.z();
-            highestZPoints.clear();  // Clear previous points with lower z
-            highestZPoints.push_back(point);
-        } else if (point.z() == maxZ) {
-            highestZPoints.push_back(point);
-        }
+      if (point.z() > maxZ) {
+        maxZ = point.z();
+        highestZPoints.clear();  // Clear previous points with lower z
+        highestZPoints.push_back(point);
+        imax = i;
+      } 
+      i++;
     }
-
-    Eigen::Vector3d pointInitial = highestZPoints[0];
+    std::vector<Eigen::Vector3d>  flatPolygons = get_planner_points();
+    Eigen::Vector3d pointInitial = flatPolygons[imax];
     double delta = 0.0;
     // Create a publisher for the /initialpose topic
 
@@ -325,18 +327,16 @@ geometry_msgs::Quaternion PathPlanner::headingToQuaternion(double x, double y, d
   return tf2::toMsg(q);
 }
 
-DynamicalSystem::DynamicalSystem(ros::NodeHandle& n)
+DynamicalSystem::DynamicalSystem(ros::NodeHandle& n, double freq)
 {
-  // Subscribe to the Pose
+  fs = freq;
   parameter_initialization();
   nh  = n;
   point_pub = nh.advertise<geometry_msgs::PointStamped>("path_point", 1);
-  sub_real_pose= nh.subscribe<geometry_msgs::Pose>( robot_name + "/ee_info/Pose" , 1000, &DynamicalSystem::UpdateRealPosition, this, ros::TransportHints().reliable().tcpNoDelay());
+  sub_real_pose= nh.subscribe<geometry_msgs::Pose>(robot_name + "/ee_info/Pose" , 1000, &DynamicalSystem::UpdateRealPosition, this, ros::TransportHints().reliable().tcpNoDelay());
 }
 
-
 void DynamicalSystem::parameter_initialization(){
-  fs = 300;
   dt=1.0/fs;
   Velocity_limit=1.5;
 
