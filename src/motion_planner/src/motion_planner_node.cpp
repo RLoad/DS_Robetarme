@@ -84,7 +84,7 @@ int main(int argc, char** argv)
   {
     ros::Time start_time = ros::Time::now();
 
-    goal.robot_position = pathplanner.firstPos;
+    goal.robot_position = pathplanner.initialPoseMsg;
 
     start_pub.publish(goal.robot_position);
 

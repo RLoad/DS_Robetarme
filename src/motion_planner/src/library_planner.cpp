@@ -178,11 +178,10 @@ void PathPlanner::publishInitialPose() {
 
    
     Eigen::Vector3d pointInitial = highestZPoints[0];
-    double delta = 0.3;
+    double delta = 0.0;
     // Create a publisher for the /initialpose topic
 
     // Create and fill the message
-    geometry_msgs::PoseWithCovarianceStamped initialPoseMsg;
     initialPoseMsg.header.seq = 0;
     initialPoseMsg.header.stamp = ros::Time(0);
     initialPoseMsg.header.frame_id = "base";
@@ -346,14 +345,11 @@ geometry_msgs::Quaternion PathPlanner::headingToQuaternion(double x, double y, d
 
 DynamicalSystem::DynamicalSystem(ros::NodeHandle& n)
 {
-
   // Subscribe to the Pose
   parameter_initialization();
   nh  = n;
   point_pub = nh.advertise<geometry_msgs::PointStamped>("path_point", 1);
-  init_pose = nh.subscribe<geometry_msgs::PoseWithCovarianceStamped>("/initialpose", 1, &DynamicalSystem::initialPoseCallback, this);
   sub_real_pose= nh.subscribe<geometry_msgs::Pose>( robot_name + "/ee_info/Pose" , 1000, &DynamicalSystem::UpdateRealPosition, this, ros::TransportHints().reliable().tcpNoDelay());
-
 }
 
 
@@ -375,12 +371,7 @@ void DynamicalSystem::parameter_initialization(){
   sum_rad = flow_radius + limit_cycle_radius;
 }
 
-void DynamicalSystem::initialPoseCallback(const geometry_msgs::PoseWithCovarianceStamped::ConstPtr& init_pose)
-{
-  initial_pose.header = init_pose->header;
-  initial_pose.pose = init_pose->pose.pose;
-  got_initial_pose = true;
-}
+
 void DynamicalSystem::set_goal(nav_msgs::Path path ,Eigen::Quaterniond quat)
 {
   centerLimitCycle(0)=path.poses[0].pose.position.x;

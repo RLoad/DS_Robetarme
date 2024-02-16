@@ -43,6 +43,7 @@ public:
     Eigen::Quaterniond targetQuat;
     Eigen::Vector3d targetPos;
     geometry_msgs::PoseStamped msgP;
+    geometry_msgs::PoseWithCovarianceStamped initialPoseMsg;
     PathPlanner(ros::NodeHandle& nh, Eigen::Quaterniond target_quat, Eigen::Vector3d target_pos, std::vector<Eigen::Vector3d> polygons_positions);
     std::vector<Eigen::Vector3d> get_planner_points();
     boustrophedon_msgs::PlanMowingPathGoal  ComputeGoal();
@@ -62,7 +63,6 @@ private:
     ros::Publisher transformedPolygonPub;
     std::vector<Eigen::Vector3d> polygonsPositions;
     std::vector<Eigen::Vector3d> flatPolygons;
-
 };
 
 class DynamicalSystem {
@@ -107,7 +107,6 @@ private:
     double flow_radius, limit_cycle_radius, sum_rad, toolOffsetFromTarget, dt, Velocity_limit;
     bool targetReceived = false;
     std::vector<Eigen::Vector3d> polygons_positions;
-    ros::Subscriber init_pose;
     ros::Subscriber sub_real_pose;
     ros::Publisher point_pub;
     ros::NodeHandle nh;
