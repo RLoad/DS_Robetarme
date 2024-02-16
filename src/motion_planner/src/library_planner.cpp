@@ -21,7 +21,6 @@ TargetExtraction::TargetExtraction(ros::NodeHandle& nh)
       ros::spinOnce();
     }
     std::cout << "rostopic for the target received" << std::endl;
-
 }
 
 std::vector<Eigen::Vector3d> TargetExtraction::get_polygons() {
@@ -44,10 +43,6 @@ std::vector<Eigen::Vector3d> TargetExtraction::get_polygons() {
         polygons_positions.push_back(position + rotation_matrix * displacement);
     }
     std::cout<<"Polygons well computed"<<std::endl;
-    // std::cout<< polygons_positions[0] <<std::endl;
-    // std::cout<< polygons_positions[1] <<std::endl;
-    // std::cout<< polygons_positions[2] <<std::endl;
-    // std::cout<< polygons_positions[3] <<std::endl;
 
     return polygons_positions;
 }
@@ -111,12 +106,9 @@ std::vector<Eigen::Vector3d> PathPlanner::get_planner_points() {
     for (size_t i = 0; i < polygonsPositions.size(); ++i) {
       Eigen::Vector3d rotated_point = transformation.inverse() * polygonsPositions[i];
       rotated_points.push_back(rotated_point);
-
     }
-
     return rotated_points;
 }
-
 
 boustrophedon_msgs::PlanMowingPathGoal  PathPlanner::ComputeGoal() {
   flatPolygons = get_planner_points();
@@ -152,14 +144,12 @@ boustrophedon_msgs::PlanMowingPathGoal  PathPlanner::ComputeGoal() {
   return goal;
 }
 
-
 // Method to calculate optimization parameters
 void PathPlanner::optimization_parameter(ros::NodeHandle& n) {
 
     // Publish parameters as ROS parameters
     n.setParam("/boustrophedon_server/stripe_separation", 2 *sum_rad);
 }
-
 
 void PathPlanner::publishInitialPose() {
     double maxZ = -std::numeric_limits<double>::infinity();
@@ -200,8 +190,6 @@ void PathPlanner::publishInitialPose() {
     initialPose.header = initialPoseMsg.header;
     initialPose.pose = initialPoseMsg.pose.pose;
 }
-
-  
 
 nav_msgs::Path PathPlanner::get_transformed_path(const nav_msgs::Path& originalPath) {
     nav_msgs::Path transformedPath;
@@ -247,7 +235,6 @@ nav_msgs::Path PathPlanner::get_transformed_path(const nav_msgs::Path& originalP
 }
 
 void PathPlanner::see_target_flat(){
-
     geometry_msgs::PolygonStamped visualpolygonTarget;
     visualpolygonTarget.header.frame_id = "base";  
     visualpolygonTarget.header.stamp = ros::Time::now();
@@ -263,8 +250,6 @@ void PathPlanner::see_target_flat(){
 }
 
 void PathPlanner::set_strategique_position(ros::NodeHandle& n){
-    
-    
     // Set values for a initial orientation
     std::vector<double> parameter_quat = {targetQuat.x(),targetQuat.y(),targetQuat.z(),targetQuat.w()};
     n.setParam("/initialQuat", parameter_quat);
@@ -289,8 +274,6 @@ bool PathPlanner::convertStripingPlanToPath(const boustrophedon_msgs::StripingPl
   path.header.stamp = striping_plan.header.stamp;
 
   path.poses.clear();
-
-
   for (std::size_t i = 0; i < striping_plan.points.size(); i++)
   {
     geometry_msgs::PoseStamped pose;
@@ -320,7 +303,6 @@ bool PathPlanner::convertStripingPlanToPath(const boustrophedon_msgs::StripingPl
   return true;
 }
 
-
 geometry_msgs::Quaternion PathPlanner::headingToQuaternion(double x, double y, double z)
 {
   // get orientation from heading vector
@@ -342,8 +324,6 @@ geometry_msgs::Quaternion PathPlanner::headingToQuaternion(double x, double y, d
 
   return tf2::toMsg(q);
 }
-
-
 
 DynamicalSystem::DynamicalSystem(ros::NodeHandle& n)
 {
@@ -372,7 +352,6 @@ void DynamicalSystem::parameter_initialization(){
   flow_radius = config["flow_radius"].as<double>();
   sum_rad = flow_radius + limit_cycle_radius;
 }
-
 
 void DynamicalSystem::set_goal(nav_msgs::Path path ,Eigen::Quaterniond quat)
 {
@@ -419,13 +398,7 @@ void DynamicalSystem::UpdateRealPosition(const geometry_msgs::Pose::ConstPtr& ms
   Eigen::Quaterniond normalizedQuat = realQuat.normalized();
   Eigen::Matrix3d rotation_matrix = normalizedQuat.toRotationMatrix();
 
-
   real_pose = real_pose + toolOffsetFromTarget*rotation_matrix.col(2);
-  
-  // for (size_t i = 0; i < 3; i++)
-  // {
-  //   real_pose_(i)=x(i);
-  // }
 
   if(!_firstRealPoseReceived)
   {
@@ -438,9 +411,7 @@ void DynamicalSystem::UpdateRealPosition(const geometry_msgs::Pose::ConstPtr& ms
     //when the eef is close the the next point it change the goal until the last point of the path
 Eigen::Vector3d DynamicalSystem::get_DS_vel(nav_msgs::Path& path_transf,double radius)
 { 
-  double tol = 0.2;
   double dx,dy,dz;
-  double linearVel=0.04;
   double norm;
   double scale_vel;
   Eigen::Vector3d d_vel_;
@@ -459,7 +430,7 @@ Eigen::Vector3d DynamicalSystem::get_DS_vel(nav_msgs::Path& path_transf,double r
     dz = path_point(2) - real_pose(2);
 
     norm = sqrt(dx*dx+dy*dy+dz*dz);
-    scale_vel = linearVel/norm;
+    scale_vel = linearVelExpected/norm;
 
     d_vel_(0)=dx*scale_vel;
     d_vel_(1)=dy*scale_vel;
@@ -472,7 +443,7 @@ Eigen::Vector3d DynamicalSystem::get_DS_vel(nav_msgs::Path& path_transf,double r
 
     std::cerr<<"target number: "<<i_follow<< std::endl;
     std::cerr<<"error"<<(std::sqrt((path_point - centerLimitCycle).norm()))<< std::endl;
-    if (std::sqrt((path_point - centerLimitCycle).norm())<=tol)
+    if (std::sqrt((path_point - centerLimitCycle).norm())<=toleranceToNextPoint)
     {
       i_follow+=1;
     }
@@ -489,7 +460,7 @@ Eigen::Vector3d DynamicalSystem::get_DS_vel(nav_msgs::Path& path_transf,double r
     dz = path_point(0) - real_pose(2);
 
     norm = sqrt(dx*dx+dy*dy+dz*dz);
-    scale_vel = linearVel/norm;
+    scale_vel = linearVelExpected/norm;
 
     d_vel_(0)=0;
     d_vel_(1)=0;
@@ -582,4 +553,11 @@ void DynamicalSystem::updateLimitCycle3DPosVel_with2DLC(Eigen::Vector3d pose, Ei
   for(int i=0; i<3; i++){
     desired_vel[i] = velocity(i);
   }
+}
+
+void DynamicalSystem::set_linear_speed(double speed){ 
+  linearVelExpected = speed;
+}
+void DynamicalSystem::set_tolerance_next_point(double tol){ 
+  toleranceToNextPoint = tol;
 }

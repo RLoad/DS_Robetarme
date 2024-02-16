@@ -16,7 +16,8 @@
 #include <vector>
 #include <string>
 
-
+// this class extrac the polygon and the Pose center of the Target
+// it should be replace by the same extraction but from a CAD
 class TargetExtraction {
 public:
     TargetExtraction(ros::NodeHandle& nh);
@@ -36,6 +37,7 @@ private:
 
 };
 
+// This class create a path that navigate throug the target depending the polygons
 class PathPlanner {
 public:
     std::vector<double> firstPos;
@@ -57,8 +59,6 @@ public:
     bool convertStripingPlanToPath(const boustrophedon_msgs::StripingPlan& striping_plan, nav_msgs::Path& path);
     geometry_msgs::Quaternion headingToQuaternion(double x, double y, double z);
 
-
-
 private:
     double flow_radius, limit_cycle_radius, optimum_radius, toolOffsetFromTarget;
     ros::Publisher initialPosePub_;
@@ -67,6 +67,7 @@ private:
     std::vector<Eigen::Vector3d> flatPolygons;
 };
 
+//This class managed the Dynamical system to return the desired veloctiy  in function of the eef pose and path
 class DynamicalSystem {
 public:
     bool finish =false;
@@ -82,12 +83,15 @@ public:
     void publishPointStamped(const Eigen::Vector3d&  path_point );
     Eigen::Matrix3d quaternionToRotationMatrix(Eigen::Vector4d q);
     void updateLimitCycle3DPosVel_with2DLC(Eigen::Vector3d pose, Eigen::Vector3d target_pose_cricleDS, double radius);
-
+    void set_linear_speed(double speed);
+    void set_tolerance_next_point(double tol);
 
 private:
+    double toleranceToNextPoint = 0.2;
+    double linearVelExpected  = 0.04;
 
     bool _firstRealPoseReceived;
-    std::size_t i_follow = 1;
+    std::size_t i_follow = 0;
 
     geometry_msgs::PoseStamped initial_pose;
     geometry_msgs::Pose       msg_real_pose_;
