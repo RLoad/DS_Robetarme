@@ -125,7 +125,6 @@ boustrophedon_msgs::PlanMowingPathGoal  PathPlanner::ComputeGoal() {
   Eigen::Vector3d p2 = flatPolygons[1];
   Eigen::Vector3d p3 = flatPolygons[2];
   Eigen::Vector3d p4 = flatPolygons[3];
-  std::cout<< p4<< std::endl;
   //polygon for the server
   boustrophedon_msgs::PlanMowingPathGoal goal;
 
@@ -159,7 +158,6 @@ void PathPlanner::optimization_parameter(ros::NodeHandle& n) {
 
     // Publish parameters as ROS parameters
     n.setParam("/boustrophedon_server/stripe_separation", 2 *sum_rad);
-    n.setParam("optimum_radius", sum_rad);
 }
 
 
@@ -237,6 +235,13 @@ nav_msgs::Path PathPlanner::get_transformed_path(const nav_msgs::Path& originalP
         // Add the transformed pose to the new path
         transformedPath.poses.push_back(transformedPose);
       }
+      geometry_msgs::PoseStamped first_pose = transformedPath.poses[0];
+
+      // Extract position (x, y, z)
+      double x = first_pose.pose.position.x;
+      double y = first_pose.pose.position.y;
+      double z = first_pose.pose.position.z;
+      firstPos = {x,y,z};
     return transformedPath;
 }
 
@@ -256,20 +261,17 @@ void PathPlanner::see_target_flat(){
     transformedPolygonPub.publish(visualpolygonTarget);
 }
 
-void PathPlanner::set_strategique_position(ros::NodeHandle& nh){
-    //taking the first point of the path
-    limitcycle.target_pose_(0)=path_transformed.poses[0].pose.position.x;
-    limitcycle.target_pose_(1)=path_transformed.poses[0].pose.position.y;
-    limitcycle.target_pose_(2)=path_transformed.poses[0].pose.position.z;
+void PathPlanner::set_strategique_position(ros::NodeHandle& n){
+    
     
     // Set values for a initial orientation
     std::vector<double> parameter_quat = {targetQuat.x(),targetQuat.y(),targetQuat.z(),targetQuat.w()};
-    nh.setParam("/initialQuat", parameter_quat);
+    n.setParam("/initialQuat", parameter_quat);
 
-    Eigen::Vector4f Quat4f = targetQuat.cast<float>();
     Eigen::Matrix3d rotationMatrix = targetQuat.toRotationMatrix();
+    Eigen::Vector3d firstPosEigen(firstPos[0],firstPos[1],firstPos[2]);
 
-    Eigen::Vector3d parameter_pos3f = targetPos - toolOffsetFromTarget  *  rotationMatrix.col(2);
+    Eigen::Vector3d parameter_pos3f = firstPosEigen - toolOffsetFromTarget  *  rotationMatrix.col(2);
     
     std::vector<double> parameter_pos;
     parameter_pos.reserve(parameter_pos3f.size());  // Reserve space for efficiency
@@ -278,37 +280,294 @@ void PathPlanner::set_strategique_position(ros::NodeHandle& nh){
     }
     n.setParam("/initialPos", parameter_pos);
     n.setParam("/finalPos", parameter_pos);
+}
+ // server has a service to convert StripingPlan to Path, but all it does it call this method
+bool PathPlanner::convertStripingPlanToPath(const boustrophedon_msgs::StripingPlan& striping_plan, nav_msgs::Path& path)
+{
+  path.header.frame_id = striping_plan.header.frame_id;
+  path.header.stamp = striping_plan.header.stamp;
 
-    //--- here waiting for orinetation control
-    limitcycle.desired_ori_velocity_filtered_(0)=pathplanning.quat_obj(0);
-    limitcycle.desired_ori_velocity_filtered_(1)=pathplanning.quat_obj(1);
-    limitcycle.desired_ori_velocity_filtered_(2)=pathplanning.quat_obj(2);
-    limitcycle.desired_ori_velocity_filtered_(3)=pathplanning.quat_obj(3);
-    double optimum_radius;
-    n.getParam("optimum_radius", optimum_radius);
-    double flow_radius;
-    n.getParam("flow_radius", flow_radius);
+  path.poses.clear();
 
-    rad_up = optimum_radius -flow_radius;
-    n.getParam("/startController", startController);
 
+  for (std::size_t i = 0; i < striping_plan.points.size(); i++)
+  {
+    geometry_msgs::PoseStamped pose;
+    pose.header.frame_id = striping_plan.header.frame_id;
+    pose.header.stamp = striping_plan.header.stamp;
+    pose.pose.position = striping_plan.points[i].point;
+
+    if (i < striping_plan.points.size() - 1)
+    {
+      double dx = striping_plan.points[i + 1].point.x - striping_plan.points[i].point.x;
+      double dy = striping_plan.points[i + 1].point.y - striping_plan.points[i].point.y;
+      double dz = striping_plan.points[i + 1].point.z - striping_plan.points[i].point.z;
+
+      pose.pose.orientation = headingToQuaternion(dx, dy, dz);
+    }
+    else
+    {
+      pose.pose.orientation.x = 0.0;
+      pose.pose.orientation.y = 0.0;
+      pose.pose.orientation.z = 0.0;
+      pose.pose.orientation.w = 1.0;
+    }
+
+    path.poses.push_back(pose);
+  }
+
+  return true;
+}
+
+
+geometry_msgs::Quaternion PathPlanner::headingToQuaternion(double x, double y, double z)
+{
+  // get orientation from heading vector
+  const tf2::Vector3 heading_vector(x, y, z);
+  const tf2::Vector3 origin(1, 0, 0);
+
+  const auto w = (origin.length() * heading_vector.length()) + tf2::tf2Dot(origin, heading_vector);
+  const tf2::Vector3 a = tf2::tf2Cross(origin, heading_vector);
+  tf2::Quaternion q(a.x(), a.y(), a.z(), w);
+  q.normalize();
+
+  if (!std::isfinite(q.x()) || !std::isfinite(q.y()) || !std::isfinite(q.z()) || !std::isfinite(q.w()))
+  {
+    q.setX(0);
+    q.setY(0);
+    q.setZ(0);
+    q.setW(1);
+  }
+
+  return tf2::toMsg(q);
 }
 
 
 
-DynamicalSystem::DynamicalSystem(ros::NodeHandle& nh)
+DynamicalSystem::DynamicalSystem(ros::NodeHandle& n)
 {
 
-    // Get the path to the package
-    std::string package_path = ros::package::getPath("motion_planner"); // Replace "your_package" with your actual package name
-    // Load parameters from YAML file
-    std::string yaml_path = package_path + "/config/config.yaml";
-    YAML::Node config = YAML::LoadFile(yaml_path);
+  // Subscribe to the Pose
+  parameter_initialization();
+  nh  = n;
+  point_pub = nh.advertise<geometry_msgs::PointStamped>("path_point", 1);
+  init_pose = nh.subscribe<geometry_msgs::PoseWithCovarianceStamped>("/initialpose", 1, &DynamicalSystem::initialPoseCallback, this);
+  sub_real_pose= nh.subscribe<geometry_msgs::Pose>( robot_name + "/ee_info/Pose" , 1000, &DynamicalSystem::UpdateRealPosition, this, ros::TransportHints().reliable().tcpNoDelay());
 
-    // Access parameters from the YAML file
-    limit_cycle_radius = config["limit_cycle_radius"].as<double>();
-    toolOffsetFromTarget = config["toolOffsetFromTarget"].as<double>();
-    flow_radius = config["flow_radius"].as<double>();
-    sum_rad = flow_radius + limit_cycle_radius;
+}
 
+
+void DynamicalSystem::parameter_initialization(){
+  fs = 300;
+  dt_=1.0/fs;
+  Velocity_limit_=1.5;
+  _toolOffsetFromEE= 0.75f;//---- knife tool with f/t sensor
+
+  // Get the path to the package
+  std::string package_path = ros::package::getPath("motion_planner"); // Replace "your_package" with your actual package name
+  // Load parameters from YAML file
+  std::string yaml_path = package_path + "/config/config.yaml";
+  YAML::Node config = YAML::LoadFile(yaml_path);
+  // Access parameters from the YAML file
+  robot_name = config["robot_name"].as<std::string>();
+  limit_cycle_radius = config["limit_cycle_radius"].as<double>();
+  toolOffsetFromTarget = config["toolOffsetFromTarget"].as<double>();
+  flow_radius = config["flow_radius"].as<double>();
+  sum_rad = flow_radius + limit_cycle_radius;
+}
+
+void DynamicalSystem::initialPoseCallback(const geometry_msgs::PoseWithCovarianceStamped::ConstPtr& init_pose)
+{
+  initial_pose.header = init_pose->header;
+  initial_pose.pose = init_pose->pose.pose;
+  got_initial_pose = true;
+}
+
+
+void DynamicalSystem::UpdateRealPosition(const geometry_msgs::Pose::ConstPtr& msg) {
+
+  got_initial_pose = true;
+
+  msg_real_pose_ = *msg;
+
+  real_pose_(0) = msg_real_pose_.position.x;
+  real_pose_(1) = msg_real_pose_.position.y;
+  real_pose_(2) = msg_real_pose_.position.z;
+
+  real_pose_ori_(0) = msg_real_pose_.orientation.x;
+  real_pose_ori_(1) = msg_real_pose_.orientation.y;
+  real_pose_ori_(2) = msg_real_pose_.orientation.z;
+  real_pose_ori_(3) = msg_real_pose_.orientation.w;
+
+  //---- Update end effector pose (position+orientation)
+  x << msg_real_pose_.position.x, msg_real_pose_.position.y, msg_real_pose_.position.z;
+  q= Eigen::Quaterniond(msg_real_pose_.orientation.w, msg_real_pose_.orientation.x, msg_real_pose_.orientation.y, msg_real_pose_.orientation.z);
+
+  Eigen::Quaterniond normalizedQuat = q.normalized();
+  Eigen::Matrix3d rotation_matrix = normalizedQuat.toRotationMatrix();
+
+  // _wRb = quaternionToRotationMatrix(_q);
+
+  x = x+_toolOffsetFromEE*rotation_matrix.col(2);
+  
+  for (size_t i = 0; i < 3; i++)
+  {
+    real_pose_(i)=x(i);
+  }
+
+  if(!_firstRealPoseReceived)
+  {
+    _firstRealPoseReceived = true;
+  }
+}
+  //----------------define all function-------------------------------------
+   
+    // this function take the path comoute from server and create a linear DS
+    //when the eef is close the the next point it change the goal until the last point of the path
+Eigen::Vector3d DynamicalSystem::calculateVelocityCommand(nav_msgs::Path& path_transf, Eigen::Vector3d real_pose_,Eigen::Vector4d desired_ori_,double radius)
+{ 
+  double tol = 0.2;
+  double dx,dy,dz;
+  double desired_vel=0.04;
+  double norm;
+  double scale_vel;
+  Eigen::Vector3d d_vel_;
+  Eigen::Vector3d path_point;
+  
+
+  if (i_follow < path_transf.poses.size() - 1)
+  {
+    path_point(0)=path_transf.poses[i_follow + 1].pose.position.x;
+    path_point(1)=path_transf.poses[i_follow + 1].pose.position.y;
+    path_point(2)=path_transf.poses[i_follow + 1].pose.position.z;
+    publishPointStamped(path_point);
+  
+    dx = path_point(0) - real_pose_(0);
+    dy = path_point(1) - real_pose_(1);
+    dz = path_point(2) - real_pose_(2);
+
+    norm = sqrt(dx*dx+dy*dy+dz*dz);
+    scale_vel = desired_vel/norm;
+
+    d_vel_(0)=dx*scale_vel;
+    d_vel_(1)=dy*scale_vel;
+    d_vel_(2)=dz*scale_vel;
+
+    if (i_follow!=0)
+    {
+      target_pose_+=d_vel_*dt_;
+    }
+
+    std::cerr<<"target number: "<<i_follow<< std::endl;
+    std::cerr<<"error"<<(std::sqrt((path_point - target_pose_).norm()))<< std::endl;
+    if (std::sqrt((path_point - target_pose_).norm())<=tol)
+    {
+      i_follow+=1;
+    }
+    updateLimitCycle3DPosVel_with2DLC(real_pose_,target_pose_,desired_ori_, radius );
+
+  }else
+  {
+    path_point(0)=path_transf.poses[i_follow].pose.position.x;
+    path_point(1)=path_transf.poses[i_follow].pose.position.y;
+    path_point(2)=path_transf.poses[i_follow].pose.position.z;
+
+    dx = path_point(2) - real_pose_(0);
+    dy = path_point(1) - real_pose_(1);
+    dz = path_point(0) - real_pose_(2);
+
+    norm = sqrt(dx*dx+dy*dy+dz*dz);
+    scale_vel = desired_vel/norm;
+
+    d_vel_(0)=0;
+    d_vel_(1)=0;
+    d_vel_(2)=0;
+    vd(0)=0;
+    vd(1)=0;
+    vd(2)=0;
+    finish =true;
+
+  }
+
+  if (vd.norm() > Velocity_limit_) {
+    vd = vd / vd.norm() * Velocity_limit_;
+      ROS_WARN_STREAM_THROTTLE(1.5, "TOO FAST");
+  }
+  return vd;
+}
+
+void DynamicalSystem::publishPointStamped(const Eigen::Vector3d&  path_point ) {
+
+geometry_msgs::PointStamped point_stamped_msg;
+point_stamped_msg.header.stamp = ros::Time::now();
+point_stamped_msg.header.frame_id = "base"; // Set your desired frame_id
+
+// Assign Eigen vector components to PointStamped message
+point_stamped_msg.point.x = path_point(0);
+point_stamped_msg.point.y = path_point(1);
+point_stamped_msg.point.z = path_point(2);
+
+// Publish the PointStamped message
+point_pub.publish(point_stamped_msg);
+}
+
+
+void DynamicalSystem::updateLimitCycle3DPosVel_with2DLC(Eigen::Vector3d pose, Eigen::Vector3d target_pose_cricleDS, Eigen::Vector4d desired_ori_, double radius) 
+{
+  double Convergence_Rate_LC_=10;
+  double Cycle_radius_LC_=radius;//0.015;
+  double Cycle_speed_LC_=2.5* 3.14;
+  float a[2] = {1., 1.};
+  float norm_a=std::sqrt(a[0]*a[0]+a[1]*a[1]);
+  for (int i=0; i<2; i++)
+      a[i]=a[i]/norm_a;
+
+  Eigen::Vector3d velocity;
+  Eigen::Vector3d pose_eig;
+
+  //--- trans real ori to rotation matrix
+  Eigen::Quaterniond new_quat;
+  new_quat.w()=desired_ori_velocity_filtered_(3);
+  new_quat.x()=desired_ori_velocity_filtered_(0);
+  new_quat.y()=desired_ori_velocity_filtered_(1);
+  new_quat.z()=desired_ori_velocity_filtered_(2);
+  Eigen::Matrix3d rotMat = new_quat.toRotationMatrix();
+
+  // std::cerr<<"pose: "<< pose(0) <<","<< pose(1) <<","<< pose(2) <<"," << std::endl;
+  // std::cerr<<"target_pose_cricleDS: "<< target_pose_cricleDS(0) <<","<< target_pose_cricleDS(1) <<","<< target_pose_cricleDS(2) <<"," << std::endl;
+
+  pose = pose-target_pose_cricleDS;
+  for (size_t i = 0; i < 3; i++)
+  {
+    pose_eig(i)=pose(i);
+  }
+  pose_eig = rotMat.transpose() * pose_eig;
+  for (int i=0; i<2; i++)
+      pose_eig(i) = a[i] * pose_eig(i);
+
+  double x_vel,y_vel,z_vel,R,T,cricle_plane_error;
+
+  x_vel = 0;
+  y_vel = 0;
+  z_vel = - Convergence_Rate_LC_ * pose_eig(2);
+
+  R = sqrt(pose_eig(0) * pose_eig(0) + pose_eig(1) * pose_eig(1));
+  T = atan2(pose_eig(1), pose_eig(0));
+
+  double Rdot = - Convergence_Rate_LC_ * (R - Cycle_radius_LC_);
+  double Tdot = Cycle_speed_LC_;
+
+  x_vel = Rdot * cos(T) - R * Tdot * sin(T);
+  y_vel = Rdot * sin(T) + R * Tdot * cos(T);
+  cricle_plane_error=pose_eig(2);
+
+  velocity(0) = x_vel;
+  velocity(1) = y_vel;
+  velocity(2) = z_vel;
+
+  velocity=rotMat*velocity;
+
+  for(int i=0; i<3; i++){
+    vd[i] = velocity(i);
+  }
 }

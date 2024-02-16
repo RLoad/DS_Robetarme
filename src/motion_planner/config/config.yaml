@@ -1,6 +1,6 @@
-width_target: 0.6
+width_target: 0.4
 height_target: 0.4
 flow_radius: 0.03
 limit_cycle_radius: 0.03
-name_robot: "ur5"
+robot_name: "ur5"
 toolOffsetFromTarget: 0.6
