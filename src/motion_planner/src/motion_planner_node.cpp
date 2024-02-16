@@ -84,7 +84,7 @@ int main(int argc, char** argv)
   {
     ros::Time start_time = ros::Time::now();
 
-    goal.robot_position = limitcycle.initial_pose;
+    goal.robot_position = pathplanner.firstPos;
 
     start_pub.publish(goal.robot_position);
 
@@ -140,7 +140,7 @@ int main(int argc, char** argv)
     }
     else{
       limitcycle.get_DS_vel(path_transformed, pathplanner.sum_rad);      
-      pub_desired_vel_filtered_.publish(get_ros_msg_vel());
+      pub_desired_vel_filtered_.publish(limitcycle.get_ros_msg_vel());
     }
     if (limitcycle.finish == true){
       n.setParam("/finishDS", true);
