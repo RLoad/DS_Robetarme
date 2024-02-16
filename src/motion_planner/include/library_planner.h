@@ -70,13 +70,14 @@ public:
     bool got_initial_pose = false;
     bool _firstRealPoseReceived;
     bool finish =false;
+    double fs;
 
     Eigen::Vector3d desired_vel_;
     Eigen::Vector3d desired_vel_filtered_;
 
     std::size_t i_follow = 1;
 
-    Eigen::Vector3d target_pose_;
+    Eigen::Vector3d centerLimitCycle;
     Eigen::Vector4d desired_ori_velocity_filtered_;
     Eigen::Vector3d vd;
 
@@ -84,10 +85,10 @@ public:
     void parameter_initialization();
     void initialPoseCallback(const geometry_msgs::PoseWithCovarianceStamped::ConstPtr& init_pose);
     void UpdateRealPosition(const geometry_msgs::Pose::ConstPtr& msg) ;
-    Eigen::Vector3d calculateVelocityCommand(nav_msgs::Path& path_transf, Eigen::Vector3d real_pose_,Eigen::Vector4d desired_ori_,double radius);
+    Eigen::Vector3d calculateVelocityCommand(nav_msgs::Path& path_transf, double radius);
     void publishPointStamped(const Eigen::Vector3d&  path_point );
     Eigen::Matrix3d quaternionToRotationMatrix(Eigen::Vector4d q);
-    void updateLimitCycle3DPosVel_with2DLC(Eigen::Vector3d pose, Eigen::Vector3d target_pose_cricleDS, Eigen::Vector4d desired_ori_, double radius);
+    void updateLimitCycle3DPosVel_with2DLC(Eigen::Vector3d pose, Eigen::Vector3d target_pose_cricleDS, double radius);
 
 
 private:
@@ -95,12 +96,13 @@ private:
     geometry_msgs::Pose       msg_real_pose_;
     geometry_msgs::Twist msg_desired_vel_;
     geometry_msgs::Pose  msg_desired_vel_filtered_;
+
     Eigen::Vector3d real_pose_, x;
     Eigen::Vector4d real_pose_ori_;
     Eigen::Quaterniond q;	
     std::string robot_name;
 
-    double flow_radius, limit_cycle_radius, sum_rad, toolOffsetFromTarget, dt, fs, Velocity_limit;
+    double flow_radius, limit_cycle_radius, sum_rad, toolOffsetFromTarget, dt, Velocity_limit;
     bool targetReceived = false;
     std::vector<Eigen::Vector3d> polygons_positions;
     ros::Subscriber init_pose;

@@ -135,9 +135,9 @@ int main(int argc, char** argv)
     {
       pathplanner.set_strategique_position(n);
       //taking the first point of the path
-      limitcycle.target_pose_(0)=path_transformed.poses[0].pose.position.x;
-      limitcycle.target_pose_(1)=path_transformed.poses[0].pose.position.y;
-      limitcycle.target_pose_(2)=path_transformed.poses[0].pose.position.z;
+      limitcycle.centerLimitCycle(0)=path_transformed.poses[0].pose.position.x;
+      limitcycle.centerLimitCycle(1)=path_transformed.poses[0].pose.position.y;
+      limitcycle.centerLimitCycle(2)=path_transformed.poses[0].pose.position.z;
       
             //--- here waiting for orinetation control
       limitcycle.desired_ori_velocity_filtered_(0)=pathplanner.targetQuat.x();
@@ -149,7 +149,7 @@ int main(int argc, char** argv)
 
     }
     else{
-      limitcycle.desired_vel_filtered_=limitcycle.calculateVelocityCommand(path_transformed, limitcycle.real_pose_,limitcycle.desired_ori_velocity_filtered_, pathplanner.sum_rad);
+      limitcycle.desired_vel_filtered_=limitcycle.calculateVelocityCommand(path_transforme, pathplanner.sum_rad);
       //ROS_INFO_STREAM("desired_vel_filtered_: " << desired_vel_filtered_ );
       limitcycle.msg_desired_vel_filtered_.position.x  = limitcycle.desired_vel_filtered_(0);
       limitcycle.msg_desired_vel_filtered_.position.y  = limitcycle.desired_vel_filtered_(1);

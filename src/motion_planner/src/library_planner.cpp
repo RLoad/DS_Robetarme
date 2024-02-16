@@ -407,7 +407,7 @@ void DynamicalSystem::UpdateRealPosition(const geometry_msgs::Pose::ConstPtr& ms
 
   // _wRb = quaternionToRotationMatrix(_q);
 
-  x = x+toolOffsetFromEE*rotation_matrix.col(2);
+  x = x+toolOffsetFromTarget*rotation_matrix.col(2);
   
   for (size_t i = 0; i < 3; i++)
   {
@@ -423,7 +423,7 @@ void DynamicalSystem::UpdateRealPosition(const geometry_msgs::Pose::ConstPtr& ms
    
     // this function take the path comoute from server and create a linear DS
     //when the eef is close the the next point it change the goal until the last point of the path
-Eigen::Vector3d DynamicalSystem::calculateVelocityCommand(nav_msgs::Path& path_transf, Eigen::Vector3d real_pose_,Eigen::Vector4d desired_ori_,double radius)
+Eigen::Vector3d DynamicalSystem::calculateVelocityCommand(nav_msgs::Path& path_transf,double radius)
 { 
   double tol = 0.2;
   double dx,dy,dz;
@@ -454,16 +454,16 @@ Eigen::Vector3d DynamicalSystem::calculateVelocityCommand(nav_msgs::Path& path_t
 
     if (i_follow!=0)
     {
-      target_pose_+=d_vel_*dt;
+      centerLimitCycle+=d_vel_*dt;
     }
 
     std::cerr<<"target number: "<<i_follow<< std::endl;
-    std::cerr<<"error"<<(std::sqrt((path_point - target_pose_).norm()))<< std::endl;
-    if (std::sqrt((path_point - target_pose_).norm())<=tol)
+    std::cerr<<"error"<<(std::sqrt((path_point - centerLimitCycle).norm()))<< std::endl;
+    if (std::sqrt((path_point - centerLimitCycle).norm())<=tol)
     {
       i_follow+=1;
     }
-    updateLimitCycle3DPosVel_with2DLC(real_pose_,target_pose_,desired_ori_, radius );
+    updateLimitCycle3DPosVel_with2DLC(real_pose_,centerLimitCycle, radius );
 
   }else
   {
@@ -511,7 +511,7 @@ point_pub.publish(point_stamped_msg);
 }
 
 
-void DynamicalSystem::updateLimitCycle3DPosVel_with2DLC(Eigen::Vector3d pose, Eigen::Vector3d target_pose_cricleDS, Eigen::Vector4d desired_ori_, double radius) 
+void DynamicalSystem::updateLimitCycle3DPosVel_with2DLC(Eigen::Vector3d pose, Eigen::Vector3d target_pose_cricleDS, double radius) 
 {
   double Convergence_Rate_LC_=10;
   double Cycle_radius_LC_=radius;//0.015;
