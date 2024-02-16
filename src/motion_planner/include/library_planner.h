@@ -74,8 +74,7 @@ public:
     bool finish =false;
     double fs;
 
-    Eigen::Vector3d desired_vel_;
-    Eigen::Vector3d desired_vel_filtered_;
+    Eigen::Vector3d desired_vel;
 
     std::size_t i_follow = 1;
 

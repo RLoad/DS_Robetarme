@@ -197,7 +197,8 @@ void PathPlanner::publishInitialPose() {
     initialPoseMsg.pose.covariance.fill(0.0);  // Fill the covariance with zeros
 
     initialPosePub_.publish(initialPoseMsg);
-    initialPos = initialPoseMsg.pose.;
+    initialPos.header = initialPoseMsg.header;
+    initialPos.pose = initialPoseMsg.pose.pose;
 }
 
   
@@ -387,9 +388,9 @@ void DynamicalSystem::set_goal(nav_msgs::Path path ,Eigen::Quaterniond quat)
 }
 geometry_msgs::Pose DynamicalSystem::get_ros_msg_vel()
 {
-  msg_desired_vel_filtered_.position.x  = desired_vel_filtered_(0);
-  msg_desired_vel_filtered_.position.y  = desired_vel_filtered_(1);
-  msg_desired_vel_filtered_.position.z  = desired_vel_filtered_(2);
+  msg_desired_vel_filtered_.position.x  = desired_vel(0);
+  msg_desired_vel_filtered_.position.y  = desired_vel_(1);
+  msg_desired_vel_filtered_.position.z  = desired_vel(2);
   msg_desired_vel_filtered_.orientation.x = desired_ori_velocity_filtered_(0);
   msg_desired_vel_filtered_.orientation.y = desired_ori_velocity_filtered_(1);  
   msg_desired_vel_filtered_.orientation.z = desired_ori_velocity_filtered_(2);  
@@ -441,7 +442,7 @@ Eigen::Vector3d DynamicalSystem::get_DS_vel(nav_msgs::Path& path_transf,double r
 { 
   double tol = 0.2;
   double dx,dy,dz;
-  double desired_vel=0.04;
+  double linearVel=0.04;
   double norm;
   double scale_vel;
   Eigen::Vector3d d_vel_;
@@ -460,7 +461,7 @@ Eigen::Vector3d DynamicalSystem::get_DS_vel(nav_msgs::Path& path_transf,double r
     dz = path_point(2) - real_pose_(2);
 
     norm = sqrt(dx*dx+dy*dy+dz*dz);
-    scale_vel = desired_vel/norm;
+    scale_vel = linearVel/norm;
 
     d_vel_(0)=dx*scale_vel;
     d_vel_(1)=dy*scale_vel;
@@ -495,18 +496,18 @@ Eigen::Vector3d DynamicalSystem::get_DS_vel(nav_msgs::Path& path_transf,double r
     d_vel_(0)=0;
     d_vel_(1)=0;
     d_vel_(2)=0;
-    vd(0)=0;
-    vd(1)=0;
-    vd(2)=0;
+    desired_vel(0)=0;
+    desired_vel(1)=0;
+    desired_vel(2)=0;
     finish =true;
 
   }
 
-  if (vd.norm() > Velocity_limit) {
-    vd = vd / vd.norm() * Velocity_limit;
+  if (desired_vel.norm() > Velocity_limit) {
+    desired_vel = desired_vel / desired_vel.norm() * Velocity_limit;
       ROS_WARN_STREAM_THROTTLE(1.5, "TOO FAST");
   }
-  return vd;
+  return desired_vel;
 }
 
 void DynamicalSystem::publishPointStamped(const Eigen::Vector3d&  path_point ) {
@@ -581,6 +582,6 @@ void DynamicalSystem::updateLimitCycle3DPosVel_with2DLC(Eigen::Vector3d pose, Ei
   velocity=rotMat*velocity;
 
   for(int i=0; i<3; i++){
-    vd[i] = velocity(i);
+    desired_vel[i] = velocity(i);
   }
 }

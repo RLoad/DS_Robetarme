@@ -42,8 +42,6 @@ int main(int argc, char** argv)
   Eigen::Vector3d posTarget = targetextraction.get_pos_target();
   
   PathPlanner pathplanner(n, quatTarget, posTarget,polygons_positions);
-
-  //frequency
   DynamicalSystem limitcycle(n);
   // Define the parameter name
   std::string param_name = "robot";
