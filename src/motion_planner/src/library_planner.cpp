@@ -77,11 +77,12 @@ void TargetExtraction::see_target(){
 //path panning functon
 
 // Constructor definition
-PathPlanner::PathPlanner(ros::NodeHandle& nh, Eigen::Quaterniond target_quat, Eigen::Vector3d target_pos, std::vector<Eigen::Vector3d> polygons_positions) : 
+PathPlanner::PathPlanner(ros::NodeHandle& n, Eigen::Quaterniond target_quat, Eigen::Vector3d target_pos, std::vector<Eigen::Vector3d> polygons_positions) : 
   initialPosePub_(nh.advertise<geometry_msgs::PoseWithCovarianceStamped>("/initialpose", 10))  {
-    transformedPolygonPub = nh.advertise<geometry_msgs::PolygonStamped>("/flat_polygon", 1, true);
 
-    std::string package_path = ros::package::getPath("motion_planner"); // Replace "your_package" with your actual package name
+    nh=n;
+    transformedPolygonPub = nh.advertise<geometry_msgs::PolygonStamped>("/flat_polygon", 1, true);
+    std::string package_path = ros::package::getPath("motion_planner"); 
     // Load parameters from YAML file
     std::string yaml_path = package_path + "/config/config.yaml";
     YAML::Node config = YAML::LoadFile(yaml_path);
@@ -92,6 +93,7 @@ PathPlanner::PathPlanner(ros::NodeHandle& nh, Eigen::Quaterniond target_quat, Ei
     flow_radius = config["flow_radius"].as<double>();
     sum_rad = flow_radius + limit_cycle_radius;
 
+    optimization_parameter();
     polygonsPositions = polygons_positions;
     targetQuat = target_quat ;
     targetPos = target_pos;
@@ -145,10 +147,9 @@ boustrophedon_msgs::PlanMowingPathGoal  PathPlanner::ComputeGoal() {
 }
 
 // Method to calculate optimization parameters
-void PathPlanner::optimization_parameter(ros::NodeHandle& n) {
-
+void PathPlanner::optimization_parameter() {
     // Publish parameters as ROS parameters
-    n.setParam("/boustrophedon_server/stripe_separation", 2 *sum_rad);
+    optimum_radius = sum_rad;
 }
 
 void PathPlanner::publishInitialPose() {
@@ -332,12 +333,12 @@ DynamicalSystem::DynamicalSystem(ros::NodeHandle& n, double freq)
   fs = freq;
   parameter_initialization();
   nh  = n;
+  pub_desired_vel_filtered = n.advertise<geometry_msgs::Pose>("/passive_control/vel_quat", 1);
   point_pub = nh.advertise<geometry_msgs::PointStamped>("path_point", 1);
   sub_real_pose= nh.subscribe<geometry_msgs::Pose>(robot_name + "/ee_info/Pose" , 1000, &DynamicalSystem::UpdateRealPosition, this, ros::TransportHints().reliable().tcpNoDelay());
 }
 
 void DynamicalSystem::parameter_initialization(){
-  dt=1.0/fs;
   Velocity_limit=1.5;
 
   // Get the path to the package
@@ -347,25 +348,32 @@ void DynamicalSystem::parameter_initialization(){
   YAML::Node config = YAML::LoadFile(yaml_path);
   // Access parameters from the YAML file
   robot_name = config["robot_name"].as<std::string>();
-  limit_cycle_radius = config["limit_cycle_radius"].as<double>();
   toolOffsetFromTarget = config["toolOffsetFromTarget"].as<double>();
-  flow_radius = config["flow_radius"].as<double>();
-  sum_rad = flow_radius + limit_cycle_radius;
 }
 
-void DynamicalSystem::set_goal(nav_msgs::Path path ,Eigen::Quaterniond quat)
+void DynamicalSystem::set_path(nav_msgs::Path path )
 {
+  desiredPath = path;
   centerLimitCycle(0)=path.poses[0].pose.position.x;
   centerLimitCycle(1)=path.poses[0].pose.position.y;
   centerLimitCycle(2)=path.poses[0].pose.position.z;
-  
-        //--- here waiting for orinetation control
-  desired_ori_velocity_filtered_(0) = quat.x();
-  desired_ori_velocity_filtered_(1) = quat.y();
-  desired_ori_velocity_filtered_(2) = quat.z();
-  desired_ori_velocity_filtered_(3) = quat.w();
+  //--- here waiting for orinetation control
+  desired_ori_velocity_filtered_(0) = path.poses[0].pose.orientation.x;
+  desired_ori_velocity_filtered_(1) = path.poses[0].pose.orientation.y;
+  desired_ori_velocity_filtered_(2) = path.poses[0].pose.orientation.z;
+  desired_ori_velocity_filtered_(3) = path.poses[0].pose.orientation.w;
 }
-geometry_msgs::Pose DynamicalSystem::get_ros_msg_vel()
+void DynamicalSystem::set_limitCycle_speed_conv(double angSpeed, double conv)
+{
+  Convergence_Rate_LC_= conv;
+  Cycle_speed_LC_     = angSpeed;
+}
+void DynamicalSystem::set_limitCycle_radius(double rad)
+{
+  Cycle_radius_LC_    = rad;
+}
+
+void DynamicalSystem::publish_ros_msg_vel()
 {
   msg_desired_vel_filtered_.position.x  = desired_vel(0);
   msg_desired_vel_filtered_.position.y  = desired_vel(1);
@@ -374,7 +382,8 @@ geometry_msgs::Pose DynamicalSystem::get_ros_msg_vel()
   msg_desired_vel_filtered_.orientation.y = desired_ori_velocity_filtered_(1);  
   msg_desired_vel_filtered_.orientation.z = desired_ori_velocity_filtered_(2);  
   msg_desired_vel_filtered_.orientation.w = desired_ori_velocity_filtered_(3); 
-  return msg_desired_vel_filtered_;
+
+  pub_desired_vel_filtered.publish(msg_desired_vel_filtered_);
 }
 
 void DynamicalSystem::UpdateRealPosition(const geometry_msgs::Pose::ConstPtr& msg) {
@@ -409,7 +418,7 @@ void DynamicalSystem::UpdateRealPosition(const geometry_msgs::Pose::ConstPtr& ms
    
     // this function take the path comoute from server and create a linear DS
     //when the eef is close the the next point it change the goal until the last point of the path
-Eigen::Vector3d DynamicalSystem::get_DS_vel(nav_msgs::Path& path_transf,double radius)
+Eigen::Vector3d DynamicalSystem::get_DS_vel()
 { 
   double dx,dy,dz;
   double norm;
@@ -417,12 +426,11 @@ Eigen::Vector3d DynamicalSystem::get_DS_vel(nav_msgs::Path& path_transf,double r
   Eigen::Vector3d d_vel_;
   Eigen::Vector3d path_point;
   
-
-  if (i_follow < path_transf.poses.size() - 1)
+  if (i_follow < desiredPath.poses.size() - 1)
   {
-    path_point(0)=path_transf.poses[i_follow + 1].pose.position.x;
-    path_point(1)=path_transf.poses[i_follow + 1].pose.position.y;
-    path_point(2)=path_transf.poses[i_follow + 1].pose.position.z;
+    path_point(0)=desiredPath.poses[i_follow + 1].pose.position.x;
+    path_point(1)=desiredPath.poses[i_follow + 1].pose.position.y;
+    path_point(2)=desiredPath.poses[i_follow + 1].pose.position.z;
     publishPointStamped(path_point);
   
     dx = path_point(0) - real_pose(0);
@@ -436,6 +444,7 @@ Eigen::Vector3d DynamicalSystem::get_DS_vel(nav_msgs::Path& path_transf,double r
     d_vel_(1)=dy*scale_vel;
     d_vel_(2)=dz*scale_vel;
 
+  double dt = 1/fs;
     if (i_follow!=0)
     {
       centerLimitCycle+=d_vel_*dt;
@@ -447,13 +456,13 @@ Eigen::Vector3d DynamicalSystem::get_DS_vel(nav_msgs::Path& path_transf,double r
     {
       i_follow+=1;
     }
-    updateLimitCycle3DPosVel_with2DLC(real_pose,centerLimitCycle, radius );
+    updateLimitCycle3DPosVel_with2DLC(real_pose,centerLimitCycle);
 
   }else
   {
-    path_point(0)=path_transf.poses[i_follow].pose.position.x;
-    path_point(1)=path_transf.poses[i_follow].pose.position.y;
-    path_point(2)=path_transf.poses[i_follow].pose.position.z;
+    path_point(0)=desiredPath.poses[i_follow].pose.position.x;
+    path_point(1)=desiredPath.poses[i_follow].pose.position.y;
+    path_point(2)=desiredPath.poses[i_follow].pose.position.z;
 
     dx = path_point(2) - real_pose(0);
     dy = path_point(1) - real_pose(1);
@@ -495,11 +504,8 @@ point_pub.publish(point_stamped_msg);
 }
 
 
-void DynamicalSystem::updateLimitCycle3DPosVel_with2DLC(Eigen::Vector3d pose, Eigen::Vector3d target_pose_cricleDS, double radius) 
+void DynamicalSystem::updateLimitCycle3DPosVel_with2DLC(Eigen::Vector3d pose, Eigen::Vector3d target_pose_cricleDS) 
 {
-  double Convergence_Rate_LC_=10;
-  double Cycle_radius_LC_=radius;//0.015;
-  double Cycle_speed_LC_=2.5* 3.14;
   float a[2] = {1., 1.};
   float norm_a=std::sqrt(a[0]*a[0]+a[1]*a[1]);
   for (int i=0; i<2; i++)
@@ -560,4 +566,39 @@ void DynamicalSystem::set_linear_speed(double speed){
 }
 void DynamicalSystem::set_tolerance_next_point(double tol){ 
   toleranceToNextPoint = tol;
+}
+void DynamicalSystem::restart_path(){
+  i_follow = 0;
+}
+BoustrophedonServer::BoustrophedonServer(ros::NodeHandle& n, double rad) : nh(n), client("plan_path", true), optimumRad(rad) {
+  // Advertise publishers
+  polygon_pub = nh.advertise<geometry_msgs::PolygonStamped>("/input_polygon", 1, true);
+  path_pub = nh.advertise<nav_msgs::Path>("/result_path", 1, true);
+  start_pub = nh.advertise<geometry_msgs::PoseStamped>("/start_pose", 1, true);
+
+  // Set parameter
+  nh.setParam("/boustrophedon_server/stripe_separation", 2 * optimumRad);
+
+  // Run roslaunch using the system function in the background
+  std::string launch_command = "roslaunch boustrophedon_server boustrophedon_server.launch";
+  launchProcessId = fork(); // Fork a new process for roslaunch
+
+  if (launchProcessId == 0) {
+      // This is the child process (roslaunch)
+      system(launch_command.c_str());
+      exit(0); // Terminate the child process after roslaunch is done
+  }
+
+  // Sleep for a short duration to allow the launch to initialize
+  std::this_thread::sleep_for(std::chrono::seconds(2));
+
+  // The client should be initialized after the launch has started
+  client.waitForServer(ros::Duration(5.0));
+}
+
+
+void BoustrophedonServer::closeRosLaunch() {
+    // Use the process ID to terminate the roslaunch process
+    std::string kill_command = "kill " + std::to_string(launchProcessId);
+    system(kill_command.c_str());
 }

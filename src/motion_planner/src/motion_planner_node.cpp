@@ -1,4 +1,5 @@
 #include <ros/ros.h>
+#include <cstdlib>
 #include <actionlib/client/simple_action_client.h>
 #include <actionlib/client/terminal_state.h>
 #include <tf2_geometry_msgs/tf2_geometry_msgs.h>
@@ -20,18 +21,13 @@
 #include <cmath>
 #include "library_planner.h"
 
-
 //----------------------- main loop ------------------------------------------------
 int main(int argc, char** argv) 
 {
   double ros_freq = 300;
   ros::init(argc, argv, "motion_planner");
   ros::NodeHandle n;
-  actionlib::SimpleActionClient<boustrophedon_msgs::PlanMowingPathAction> client("plan_path",true);  // server name and spin thread
-  ros::Publisher polygon_pub = n.advertise<geometry_msgs::PolygonStamped>("/input_polygon", 1, true);
-  ros::Publisher path_pub = n.advertise<nav_msgs::Path>("/result_path", 1, true);
-  ros::Publisher start_pub = n.advertise<geometry_msgs::PoseStamped>("/start_pose", 1, true);
-  ros::Publisher pub_desired_vel_filtered_ = n.advertise<geometry_msgs::Pose>("/passive_control/vel_quat", 1);
+
   ros::Rate loop_rate(ros_freq);
 
   TargetExtraction targetextraction(n);
@@ -43,17 +39,18 @@ int main(int argc, char** argv)
   // get corner_polygons()
   
   PathPlanner pathplanner(n, quatTarget, posTarget,polygons_positions);
-  DynamicalSystem limitcycle(n, ros_freq);
+  DynamicalSystem dynamicalsystem(n, ros_freq);
+  BoustrophedonServer boustrophedonserver(n,pathplanner.optimum_radius);
 
   ROS_INFO("Waiting for action server to start.");
   // wait for the action server to startnew_rad
-  client.waitForServer();  // will wait for infinite time
+  boustrophedonserver.client.waitForServer();  // will wait for infinite time
 
   ROS_INFO("Action server started");
 
   boustrophedon_msgs::PlanMowingPathGoal goal;
   goal = pathplanner.ComputeGoal();
-  polygon_pub.publish(goal.property);
+  boustrophedonserver.polygon_pub.publish(goal.property);
 
   ROS_INFO_STREAM("Waiting for goal");
   pathplanner.publishInitialPose();
@@ -62,20 +59,25 @@ int main(int argc, char** argv)
   nav_msgs::Path path_transformed;
   n.setParam("/startDS", false);
   n.setParam("/finishDS", false);
-  // extract initial_pose from optitrack center of marker
+
+  // set info for DS (shoul be inside the constructor)
+  dynamicalsystem.set_linear_speed(0.04);
+  dynamicalsystem.set_limitCycle_speed_conv(2*3.14, 10);
+  dynamicalsystem.set_limitCycle_radius(pathplanner.optimum_radius);
+
   while (ros::ok())
   {
     ros::Time start_time = ros::Time::now();
 
     goal.robot_position = pathplanner.initialPose;
-    start_pub.publish(goal.robot_position);
-    client.sendGoal(goal);
+    boustrophedonserver.start_pub.publish(goal.robot_position);
+    boustrophedonserver.client.sendGoal(goal);
     ROS_INFO_STREAM("Sending goal");
 
     // wait for the action to return
-    bool finished_before_timeout = client.waitForResult(ros::Duration(30.0));
-    actionlib::SimpleClientGoalState state = client.getState();
-    boustrophedon_msgs::PlanMowingPathResultConstPtr result = client.getResult();
+    bool finished_before_timeout = boustrophedonserver.client.waitForResult(ros::Duration(30.0));
+    actionlib::SimpleClientGoalState state = boustrophedonserver.client.getState();
+    boustrophedon_msgs::PlanMowingPathResultConstPtr result = boustrophedonserver.client.getResult();
     if (result->plan.points.size() < 1)
     {
       ROS_INFO("Action did not finish before the time out.");
@@ -85,45 +87,41 @@ int main(int argc, char** argv)
 
       std::cout << "Result with : " << result->plan.points.size() << std::endl;
 
-      if (result->plan.points.size() >=5){
+      if (result->plan.points.size() >2){
         pathplanner.convertStripingPlanToPath(result->plan, path);
         path_transformed = pathplanner.get_transformed_path(path);
+        dynamicalsystem.set_path(path_transformed);
+        boustrophedonserver.path_pub.publish(path_transformed);
+        boustrophedonserver.closeRosLaunch();
         break;
       }
     }
-
     ros::spinOnce();
     loop_rate.sleep();
   }
+  
+  // set Ros param to different node start/Stop
   n.setParam("/startDS", true);
-
-
   bool startController;
   n.getParam("/startController", startController);
+  pathplanner.set_strategique_position(n);
+
+
+  // waiting for controller
+  while(!startController && ros::ok()){
+    n.getParam("/startController", startController);
+  }
 
   while (ros::ok())
   {
-
     ros::Time start_time = ros::Time::now();
-
-
-    path_pub.publish(path_transformed);
-
     ros::Time end_time = ros::Time::now();
     ros::Duration elapsed_time = end_time - start_time;
 
-    if (startController == false)
-    {
-      pathplanner.set_strategique_position(n);
-      //taking the first point of the path
-      limitcycle.set_goal(path_transformed, pathplanner.targetQuat );
-      n.getParam("/startController", startController);
-    }
-    else{
-      limitcycle.get_DS_vel(path_transformed, pathplanner.sum_rad);      
-      pub_desired_vel_filtered_.publish(limitcycle.get_ros_msg_vel());
-    }
-    if (limitcycle.finish == true){
+    dynamicalsystem.get_DS_vel();      
+    dynamicalsystem.publish_ros_msg_vel();    
+
+    if (dynamicalsystem.finish == true){
       n.setParam("/finishDS", true);
       break;
     }
@@ -136,8 +134,3 @@ int main(int argc, char** argv)
 
   return 0;
 }
-
-
-
-
-

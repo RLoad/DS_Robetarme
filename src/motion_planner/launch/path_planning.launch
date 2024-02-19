@@ -10,6 +10,6 @@
 
     <param name="height_target" type="double" value="0.4"/>
     <param name="width_target" type="double" value="0.4"/>
-    <include file="$(find boustrophedon_server)/launch/boustrophedon_server.launch"/>
+    <!-- <include file="$(find boustrophedon_server)/launch/boustrophedon_server.launch"/> -->
     <node pkg="motion_planner" type="motion_planner_node" name="motion_planner_node" output="screen"/>
 </launch>
