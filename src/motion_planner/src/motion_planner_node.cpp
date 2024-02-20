@@ -60,11 +60,6 @@ int main(int argc, char** argv)
   n.setParam("/startDS", false);
   n.setParam("/finishDS", false);
 
-  // set info for DS (shoul be inside the constructor)
-  dynamicalsystem.set_linear_speed(0.04);
-  dynamicalsystem.set_limitCycle_speed_conv(2*3.14, 10);
-  dynamicalsystem.set_limitCycle_radius(pathplanner.optimum_radius);
-
   while (ros::ok())
   {
     ros::Time start_time = ros::Time::now();

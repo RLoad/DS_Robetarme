@@ -59,7 +59,7 @@ public:
     geometry_msgs::PoseStamped get_initial_pos_ros_msg();
     std::vector<Eigen::Vector3d> get_planner_points();
     boustrophedon_msgs::PlanMowingPathGoal  ComputeGoal();
-    void optimization_parameter();
+    int optimization_parameter();
     void publishInitialPose();
     nav_msgs::Path get_transformed_path(const nav_msgs::Path& originalPath);
     void see_target_flat();
@@ -68,12 +68,15 @@ public:
     geometry_msgs::Quaternion headingToQuaternion(double x, double y, double z);
 
 private:
-    double flow_radius, limit_cycle_radius, toolOffsetFromTarget;
+    double flow_radius, limit_cycle_radius, toolOffsetFromTarget, scaleFactor;
     ros::NodeHandle nh;
     ros::Publisher initialPosePub_;
     ros::Publisher transformedPolygonPub;
     std::vector<Eigen::Vector3d> polygonsPositions;
     std::vector<Eigen::Vector3d> flatPolygons;
+    Eigen::Vector3d findCenter(const std::vector<Eigen::Vector3d>& vertices);
+    void scalePolygon(std::vector<Eigen::Vector3d>& vertices);
+    double  find_height();
 };
 
 //This class managed the Dynamical system to return the desired veloctiy  in function of the eef pose and path
@@ -98,11 +101,11 @@ public:
     void restart_path();
 
 private:
-    double Convergence_Rate_LC_ = 10;
-    double Cycle_radius_LC_     = 0.015;
-    double Cycle_speed_LC_      = 2.5* 3.14;
+    double Convergence_Rate_LC  = 10;
+    double Cycle_radius_LC      = 0.015;
+    double Cycle_speed_LC       = 2.5* 3.14;
     double fs                   = 100;
-    double toleranceToNextPoint = 0.2;
+    double toleranceToNextPoint = 0.05;
     double linearVelExpected    = 0.04;
 
     bool _firstRealPoseReceived;

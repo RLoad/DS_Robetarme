@@ -26,7 +26,7 @@ TargetExtraction::TargetExtraction(ros::NodeHandle& nh)
 std::vector<Eigen::Vector3d> TargetExtraction::get_polygons() {
     // Desired displacements
     std::vector<Eigen::Vector3d> displacements{
-        Eigen::Vector3d(width_target / 2.0, height_target / 2.0, 0),
+        Eigen::Vector3d(width_target / 2.0, height_target / 1.0, 0),
         Eigen::Vector3d(-width_target / 2.0, height_target / 2.0, 0),
         Eigen::Vector3d(-width_target / 2.0, -height_target / 2.0, 0),
         Eigen::Vector3d(width_target / 2.0, -height_target / 2.0, 0)
@@ -46,9 +46,11 @@ std::vector<Eigen::Vector3d> TargetExtraction::get_polygons() {
 
     return polygons_positions;
 }
+
 Eigen::Quaterniond TargetExtraction::get_quat_target() {
     return targetQuat;
 }
+
 Eigen::Vector3d TargetExtraction::get_pos_target() {
     return targetPos;
 }
@@ -93,16 +95,57 @@ PathPlanner::PathPlanner(ros::NodeHandle& n, Eigen::Quaterniond target_quat, Eig
     flow_radius = config["flow_radius"].as<double>();
     sum_rad = flow_radius + limit_cycle_radius;
 
-    optimization_parameter();
     polygonsPositions = polygons_positions;
     targetQuat = target_quat ;
     targetPos = target_pos;
+    optimization_parameter();
+}
+
+// Function to find the center of the polygon
+Eigen::Vector3d PathPlanner::findCenter(const std::vector<Eigen::Vector3d>& vertices) {
+    Eigen::Vector3d center(0.0, 0.0, 0.0);
+    for (const auto& vertex : vertices) {
+        center += vertex;
+    }
+    center /= static_cast<double>(vertices.size());
+    return center;
+}
+
+// Function to scale a polygon around its center
+void PathPlanner::scalePolygon(std::vector<Eigen::Vector3d>& vertices) {
+
+  // Find the center of the polygon
+  Eigen::Vector3d center = findCenter(vertices);
+  //calculate the sacelfactor
+  Eigen::Vector3d diff = center - vertices[0];
+  double d = diff.norm();
+  double scaleFactor = (d-optimum_radius*0.8)/d;
+
+  
+  // Translate the polygon to the origin
+  for (auto& vertex : vertices) {
+      vertex -= center;
   }
+
+  // Apply scaling factor to the vertices
+  for (auto& vertex : vertices) {
+      vertex *= scaleFactor;
+  }
+
+  // Translate the polygon back to its original position
+  for (auto& vertex : vertices) {
+      vertex += center;
+  }
+}
+
 
 std::vector<Eigen::Vector3d> PathPlanner::get_planner_points() {
 
     std::vector<Eigen::Vector3d> rotated_points;
     
+    PathPlanner::scalePolygon(polygonsPositions);
+
+
     Eigen::Affine3d transformation = Eigen::Translation3d(targetPos(0),targetPos(1),targetPos(2)) * targetQuat.conjugate();
 
     Eigen::MatrixXd points_matrix(polygonsPositions.size(), 3);
@@ -147,11 +190,56 @@ boustrophedon_msgs::PlanMowingPathGoal  PathPlanner::ComputeGoal() {
   return goal;
 }
 
-// Method to calculate optimization parameters
-void PathPlanner::optimization_parameter() {
-    // Publish parameters as ROS parameters
-    optimum_radius = sum_rad;
+double PathPlanner::find_height() {
+    if (polygonsPositions.empty()) {
+        // Handle the case when there are no points
+        return 0.0;
+    }
+
+    double maxZ = -std::numeric_limits<double>::infinity();
+    double minZ = std::numeric_limits<double>::infinity();
+    std::vector<Eigen::Vector3d> lowestZPoints;
+    std::vector<Eigen::Vector3d> highestZPoints;
+
+    for (const auto& point : polygonsPositions) {
+        if (point.z() > maxZ) {
+            maxZ = point.z();
+            highestZPoints.clear();
+            highestZPoints.push_back(point);
+        } else if (point.z() < minZ) {
+            minZ = point.z();
+            lowestZPoints.clear();
+            lowestZPoints.push_back(point);
+        }
+    }
+
+    if (lowestZPoints.empty() || highestZPoints.empty()) {
+        // Handle the case when vectors are empty (no points found)
+        return 0.0;
+    }
+
+    Eigen::Vector3d diff = lowestZPoints[0] - highestZPoints[0];
+    double height = diff.norm();
+    return height;
 }
+
+
+int PathPlanner::optimization_parameter() {
+  double D = find_height();
+
+  if (D == 0.0){
+    optimum_radius =  sum_rad;
+    return 0;
+  }
+  double d = sum_rad;
+  double n = D / d;
+  int roundedNumber = std::round(n);
+  double r_new = D / roundedNumber ;
+  optimum_radius = r_new;
+  return 1;
+
+}
+
 
 void PathPlanner::publishInitialPose() {
     double maxZ = -std::numeric_limits<double>::infinity();
@@ -353,6 +441,11 @@ void DynamicalSystem::parameter_initialization(){
   YAML::Node config = YAML::LoadFile(yaml_path);
   // Access parameters from the YAML file
   robot_name = config["robot_name"].as<std::string>();
+  Cycle_radius_LC = config["limit_cycle_radius"].as<double>();
+  Cycle_speed_LC = config["limit_cycle_speed"].as<double>();
+  linearVelExpected = config["linear_speed"].as<double>();
+  Convergence_Rate_LC =config["conv_rate"].as<double>();
+
   toolOffsetFromTarget = config["toolOffsetFromTarget"].as<double>();
 }
 
@@ -370,12 +463,12 @@ void DynamicalSystem::set_path(nav_msgs::Path path )
 }
 void DynamicalSystem::set_limitCycle_speed_conv(double angSpeed, double conv)
 {
-  Convergence_Rate_LC_= conv;
-  Cycle_speed_LC_     = angSpeed;
+  Convergence_Rate_LC = conv;
+  Cycle_speed_LC      = angSpeed;
 }
 void DynamicalSystem::set_limitCycle_radius(double rad)
 {
-  Cycle_radius_LC_    = rad;
+  Cycle_radius_LC    = rad;
 }
 
 void DynamicalSystem::publish_ros_msg_vel()
@@ -449,11 +542,10 @@ Eigen::Vector3d DynamicalSystem::get_DS_vel()
     d_vel_(1)=dy*scale_vel;
     d_vel_(2)=dz*scale_vel;
 
-  double dt = 1/fs;
-    if (i_follow!=0)
-    {
-      centerLimitCycle+=d_vel_*dt;
-    }
+    double dt = 1/fs;
+    
+    centerLimitCycle+=d_vel_*dt;
+    
 
     std::cerr<<"target number: "<<i_follow<< std::endl;
     std::cerr<<"error"<<(std::sqrt((path_point - centerLimitCycle).norm()))<< std::endl;
@@ -543,13 +635,13 @@ void DynamicalSystem::updateLimitCycle3DPosVel_with2DLC(Eigen::Vector3d pose, Ei
 
   x_vel = 0;
   y_vel = 0;
-  z_vel = - Convergence_Rate_LC_ * pose_eig(2);
+  z_vel = - Convergence_Rate_LC * pose_eig(2);
 
   R = sqrt(pose_eig(0) * pose_eig(0) + pose_eig(1) * pose_eig(1));
   T = atan2(pose_eig(1), pose_eig(0));
 
-  double Rdot = - Convergence_Rate_LC_ * (R - Cycle_radius_LC_);
-  double Tdot = Cycle_speed_LC_;
+  double Rdot = - Convergence_Rate_LC * (R - Cycle_radius_LC);
+  double Tdot = Cycle_speed_LC;
 
   x_vel = Rdot * cos(T) - R * Tdot * sin(T);
   y_vel = Rdot * sin(T) + R * Tdot * cos(T);
