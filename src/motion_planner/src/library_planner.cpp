@@ -102,7 +102,8 @@ PathPlanner::PathPlanner(ros::NodeHandle& n, Eigen::Quaterniond target_quat, Eig
 std::vector<Eigen::Vector3d> PathPlanner::get_planner_points() {
 
     std::vector<Eigen::Vector3d> rotated_points;
-    Eigen::Affine3d transformation = Eigen::Translation3d(targetPos(0),targetPos(1),targetPos(2)) * targetQuat;
+    
+    Eigen::Affine3d transformation = Eigen::Translation3d(targetPos(0),targetPos(1),targetPos(2)) * targetQuat.conjugate();
 
     Eigen::MatrixXd points_matrix(polygonsPositions.size(), 3);
     for (size_t i = 0; i < polygonsPositions.size(); ++i) {
@@ -170,6 +171,8 @@ void PathPlanner::publishInitialPose() {
     }
     std::vector<Eigen::Vector3d>  flatPolygons = get_planner_points();
     Eigen::Vector3d pointInitial = flatPolygons[imax];
+    see_target_flat();
+    std::cout<<points[imax]<< std::endl;
     double delta = 0.0;
     // Create a publisher for the /initialpose topic
 
@@ -196,7 +199,7 @@ void PathPlanner::publishInitialPose() {
 
 nav_msgs::Path PathPlanner::get_transformed_path(const nav_msgs::Path& originalPath) {
     nav_msgs::Path transformedPath;
-    Eigen::Affine3d transformation = Eigen::Translation3d(targetPos(0),targetPos(1),targetPos(2)) * targetQuat;
+    Eigen::Affine3d transformation = Eigen::Translation3d(targetPos(0),targetPos(1),targetPos(2)) * targetQuat.conjugate();;
 
     transformedPath.header = originalPath.header;
 
@@ -208,10 +211,12 @@ nav_msgs::Path PathPlanner::get_transformed_path(const nav_msgs::Path& originalP
 
         // Apply transformation
         Eigen::Vector3d transformedPosition = transformation * originalPosition;
+        // std::cout << originalOrientation.w() << std::endl;
         
         // Convert the rotation matrix to a quaternion before applying the rotation
-        Eigen::Quaterniond transformedOrientation(transformation.rotation());
-        transformedOrientation = transformedOrientation * originalOrientation;
+        // Eigen::Quaterniond transformedOrientation(transformation.rotation());
+        // transformedOrientation = transformedOrientation * originalOrientation;
+        Eigen::Quaterniond transformedOrientation = targetQuat;
 
         // Convert back to geometry_msgs types
         geometry_msgs::PoseStamped transformedPose;
@@ -577,7 +582,7 @@ BoustrophedonServer::BoustrophedonServer(ros::NodeHandle& n, double rad) : nh(n)
   start_pub = nh.advertise<geometry_msgs::PoseStamped>("/start_pose", 1, true);
 
   // Set parameter
-  nh.setParam("/boustrophedon_server/stripe_separation", 2 * optimumRad);
+  nh.setParam("/boustrophedon_server/stripe_separation",  optimumRad);
 
   // Run roslaunch using the system function in the background
   std::string launch_command = "roslaunch boustrophedon_server boustrophedon_server.launch";

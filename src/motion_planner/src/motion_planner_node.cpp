@@ -34,6 +34,7 @@ int main(int argc, char** argv)
   std::vector<Eigen::Vector3d> polygons_positions = targetextraction.get_polygons();
   Eigen::Quaterniond quatTarget = targetextraction.get_quat_target();
   Eigen::Vector3d posTarget = targetextraction.get_pos_target();
+  targetextraction.see_target();
 
   // get_polygons_optimzed()
   // get corner_polygons()
@@ -41,7 +42,6 @@ int main(int argc, char** argv)
   PathPlanner pathplanner(n, quatTarget, posTarget,polygons_positions);
   DynamicalSystem dynamicalsystem(n, ros_freq);
   BoustrophedonServer boustrophedonserver(n,pathplanner.optimum_radius);
-
   ROS_INFO("Waiting for action server to start.");
   // wait for the action server to startnew_rad
   boustrophedonserver.client.waitForServer();  // will wait for infinite time
