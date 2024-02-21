@@ -99,7 +99,6 @@ int main(int argc, char** argv)
   n.setParam("/startDS", true);
   bool startController;
   n.getParam("/startController", startController);
-  pathplanner.set_strategique_position(n);
 
 
   // waiting for controller
@@ -125,6 +124,7 @@ int main(int argc, char** argv)
     loop_rate.sleep();
 
   } 
+
   n.setParam("/startDS", false);
 
   return 0;

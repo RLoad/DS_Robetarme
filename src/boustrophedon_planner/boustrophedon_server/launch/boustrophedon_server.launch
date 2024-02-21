@@ -3,7 +3,7 @@
     <!-- Run your node using the received parameters -->
     <node pkg="boustrophedon_server" type="boustrophedon_planner_server" name="boustrophedon_server" output="screen">
         <param name="repeat_boundary" value="false"/>
-        <param name="outline_clockwise" value="true"/>
+        <param name="outline_clockwise" value="false"/>
         <param name="skip_outlines" value="false"/>
         <param name="outline_layer_count" value="0"/>
         <!-- <param name="stripe_separation" value="0.2"/> -->

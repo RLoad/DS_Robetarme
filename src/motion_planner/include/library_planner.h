@@ -102,10 +102,10 @@ public:
 
 private:
     double Convergence_Rate_LC  = 10;
-    double Cycle_radius_LC      = 0.015;
+    double Cycle_radius_LC      = 0.03;
     double Cycle_speed_LC       = 2.5* 3.14;
     double fs                   = 100;
-    double toleranceToNextPoint = 0.05;
+    double toleranceToNextPoint = 0.1;
     double linearVelExpected    = 0.04;
 
     bool _firstRealPoseReceived;

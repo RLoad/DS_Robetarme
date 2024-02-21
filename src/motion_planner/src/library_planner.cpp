@@ -26,7 +26,7 @@ TargetExtraction::TargetExtraction(ros::NodeHandle& nh)
 std::vector<Eigen::Vector3d> TargetExtraction::get_polygons() {
     // Desired displacements
     std::vector<Eigen::Vector3d> displacements{
-        Eigen::Vector3d(width_target / 2.0, height_target / 1.0, 0),
+        Eigen::Vector3d(width_target / 2.0, height_target / 2.0 , 0),
         Eigen::Vector3d(-width_target / 2.0, height_target / 2.0, 0),
         Eigen::Vector3d(-width_target / 2.0, -height_target / 2.0, 0),
         Eigen::Vector3d(width_target / 2.0, -height_target / 2.0, 0)
@@ -233,7 +233,7 @@ int PathPlanner::optimization_parameter() {
   }
   double d = sum_rad;
   double n = D / d;
-  int roundedNumber = std::round(n);
+  int roundedNumber = std::round(n)+4 ;
   double r_new = D / roundedNumber ;
   optimum_radius = r_new;
   return 1;
@@ -242,47 +242,47 @@ int PathPlanner::optimization_parameter() {
 
 
 void PathPlanner::publishInitialPose() {
-    double maxZ = -std::numeric_limits<double>::infinity();
-    std::vector<Eigen::Vector3d> highestZPoints;
-    int imax = 0;
-    int i = 0;
+  double maxZ = -std::numeric_limits<double>::infinity();
+  std::vector<Eigen::Vector3d> highestZPoints;
+  int imax = 0;
+  int i = 0;
 
-    std::vector<Eigen::Vector3d> points = polygonsPositions;
-    for (const auto& point : points) {
-      if (point.z() > maxZ) {
-        maxZ = point.z();
-        highestZPoints.clear();  // Clear previous points with lower z
-        highestZPoints.push_back(point);
-        imax = i;
-      } 
-      i++;
-    }
-    std::vector<Eigen::Vector3d>  flatPolygons = get_planner_points();
-    Eigen::Vector3d pointInitial = flatPolygons[imax];
-    see_target_flat();
-    std::cout<<points[imax]<< std::endl;
-    double delta = 0.0;
-    // Create a publisher for the /initialpose topic
+  std::vector<Eigen::Vector3d> points = polygonsPositions;
+  for (const auto& point : points) {
+    if (point.z() > maxZ) {
+      maxZ = point.z();
+      highestZPoints.clear();  // Clear previous points with lower z
+      highestZPoints.push_back(point);
+      imax = i;
+    } 
+    i++;
+  }
+  std::vector<Eigen::Vector3d>  flatPolygons = get_planner_points();
+  Eigen::Vector3d pointInitial = flatPolygons[imax];
+  see_target_flat();
+  std::cout<<points[imax]<< std::endl;
+  double delta = 0.1;
+  // Create a publisher for the /initialpose topic
 
-    // Create and fill the message
-    initialPoseMsg.header.seq = 0;
-    initialPoseMsg.header.stamp = ros::Time(0);
-    initialPoseMsg.header.frame_id = "base";
+  // Create and fill the message
+  initialPoseMsg.header.seq = 0;
+  initialPoseMsg.header.stamp = ros::Time(0);
+  initialPoseMsg.header.frame_id = "base";
 
-    initialPoseMsg.pose.pose.position.x = pointInitial(0)- delta;
-    initialPoseMsg.pose.pose.position.y = pointInitial(1)- delta;
-    initialPoseMsg.pose.pose.position.z = pointInitial(2);
+  initialPoseMsg.pose.pose.position.x = pointInitial(0)+ delta;
+  initialPoseMsg.pose.pose.position.y = pointInitial(1)- delta;
+  initialPoseMsg.pose.pose.position.z = pointInitial(2);
 
-    initialPoseMsg.pose.pose.orientation.x = 0.0;
-    initialPoseMsg.pose.pose.orientation.y = 0.0;
-    initialPoseMsg.pose.pose.orientation.z = 0.0;
-    initialPoseMsg.pose.pose.orientation.w = 1.0;
+  initialPoseMsg.pose.pose.orientation.x = 0.0;
+  initialPoseMsg.pose.pose.orientation.y = 0.0;
+  initialPoseMsg.pose.pose.orientation.z = 0.0;
+  initialPoseMsg.pose.pose.orientation.w = 1.0;
 
-    initialPoseMsg.pose.covariance.fill(0.0);  // Fill the covariance with zeros
+  initialPoseMsg.pose.covariance.fill(0.0);  // Fill the covariance with zeros
 
-    initialPosePub_.publish(initialPoseMsg);
-    initialPose.header = initialPoseMsg.header;
-    initialPose.pose = initialPoseMsg.pose.pose;
+  initialPosePub_.publish(initialPoseMsg);
+  initialPose.header = initialPoseMsg.header;
+  initialPose.pose = initialPoseMsg.pose.pose;
 }
 
 nav_msgs::Path PathPlanner::get_transformed_path(const nav_msgs::Path& originalPath) {
@@ -445,6 +445,7 @@ void DynamicalSystem::parameter_initialization(){
   Cycle_speed_LC = config["limit_cycle_speed"].as<double>();
   linearVelExpected = config["linear_speed"].as<double>();
   Convergence_Rate_LC =config["conv_rate"].as<double>();
+  toleranceToNextPoint =config["toleranceToNextPoint"].as<double>();
 
   toolOffsetFromTarget = config["toolOffsetFromTarget"].as<double>();
 }

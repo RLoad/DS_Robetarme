@@ -1,12 +1,14 @@
-width_target: 0.5
-height_target: 0.5
+width_target: 0.4
+height_target: 0.35
 
 flow_radius: 0.03
-limit_cycle_radius: 0.03
+limit_cycle_radius: 0.05
 
 limit_cycle_speed: 10
-linear_speed: 0.04
-conv_rate: 10
+linear_speed: 0.06
+conv_rate: 50
 
 robot_name: "ur5"
 toolOffsetFromTarget: 0.7
+
+toleranceToNextPoint: 0.11
