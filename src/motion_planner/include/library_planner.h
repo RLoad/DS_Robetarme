@@ -63,7 +63,7 @@ public:
     void publishInitialPose();
     nav_msgs::Path get_transformed_path(const nav_msgs::Path& originalPath);
     void see_target_flat();
-    void set_strategique_position(ros::NodeHandle& n);
+    void set_strategique_position();
     bool convertStripingPlanToPath(const boustrophedon_msgs::StripingPlan& striping_plan, nav_msgs::Path& path);
     geometry_msgs::Quaternion headingToQuaternion(double x, double y, double z);
 

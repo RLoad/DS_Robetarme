@@ -292,41 +292,42 @@ nav_msgs::Path PathPlanner::get_transformed_path(const nav_msgs::Path& originalP
     transformedPath.header = originalPath.header;
 
     for (const auto& pose : originalPath.poses) {
-        // Convert pose to Eigen types for transformation
-        Eigen::Vector3d originalPosition(pose.pose.position.x, pose.pose.position.y, pose.pose.position.z);
-        Eigen::Quaterniond originalOrientation(pose.pose.orientation.w, pose.pose.orientation.x,
-                                                pose.pose.orientation.y, pose.pose.orientation.z);
+      // Convert pose to Eigen types for transformation
+      Eigen::Vector3d originalPosition(pose.pose.position.x, pose.pose.position.y, pose.pose.position.z);
+      Eigen::Quaterniond originalOrientation(pose.pose.orientation.w, pose.pose.orientation.x,
+                                              pose.pose.orientation.y, pose.pose.orientation.z);
 
-        // Apply transformation
-        Eigen::Vector3d transformedPosition = transformation * originalPosition;
-        // std::cout << originalOrientation.w() << std::endl;
-        
-        // Convert the rotation matrix to a quaternion before applying the rotation
-        // Eigen::Quaterniond transformedOrientation(transformation.rotation());
-        // transformedOrientation = transformedOrientation * originalOrientation;
-        Eigen::Quaterniond transformedOrientation = targetQuat;
+      // Apply transformation
+      Eigen::Vector3d transformedPosition = transformation * originalPosition;
+      // std::cout << originalOrientation.w() << std::endl;
+      
+      // Convert the rotation matrix to a quaternion before applying the rotation
+      // Eigen::Quaterniond transformedOrientation(transformation.rotation());
+      // transformedOrientation = transformedOrientation * originalOrientation;
+      Eigen::Quaterniond transformedOrientation = targetQuat;
 
-        // Convert back to geometry_msgs types
-        geometry_msgs::PoseStamped transformedPose;
-        transformedPose.header = originalPath.header;
-        transformedPose.pose.position.x = transformedPosition.x();
-        transformedPose.pose.position.y = transformedPosition.y();
-        transformedPose.pose.position.z = transformedPosition.z();
-        transformedPose.pose.orientation.w = transformedOrientation.w();
-        transformedPose.pose.orientation.x = transformedOrientation.x();
-        transformedPose.pose.orientation.y = transformedOrientation.y();
-        transformedPose.pose.orientation.z = transformedOrientation.z();
+      // Convert back to geometry_msgs types
+      geometry_msgs::PoseStamped transformedPose;
+      transformedPose.header = originalPath.header;
+      transformedPose.pose.position.x = transformedPosition.x();
+      transformedPose.pose.position.y = transformedPosition.y();
+      transformedPose.pose.position.z = transformedPosition.z();
+      transformedPose.pose.orientation.w = transformedOrientation.w();
+      transformedPose.pose.orientation.x = transformedOrientation.x();
+      transformedPose.pose.orientation.y = transformedOrientation.y();
+      transformedPose.pose.orientation.z = transformedOrientation.z();
 
-        // Add the transformed pose to the new path
-        transformedPath.poses.push_back(transformedPose);
-      }
-      geometry_msgs::PoseStamped first_pose = transformedPath.poses[0];
+      // Add the transformed pose to the new path
+      transformedPath.poses.push_back(transformedPose);
+    }
+    geometry_msgs::PoseStamped first_pose = transformedPath.poses[0];
 
-      // Extract position (x, y, z)
-      double x = first_pose.pose.position.x;
-      double y = first_pose.pose.position.y;
-      double z = first_pose.pose.position.z;
-      firstPos = {x,y,z};
+    // Extract position (x, y, z)
+    double x = first_pose.pose.position.x;
+    double y = first_pose.pose.position.y;
+    double z = first_pose.pose.position.z;
+    firstPos = {x,y,z};
+    set_strategique_position();
     return transformedPath;
 }
 
@@ -345,10 +346,10 @@ void PathPlanner::see_target_flat(){
     transformedPolygonPub.publish(visualpolygonTarget);
 }
 
-void PathPlanner::set_strategique_position(ros::NodeHandle& n){
+void PathPlanner::set_strategique_position(){
     // Set values for a initial orientation
     std::vector<double> parameter_quat = {targetQuat.x(),targetQuat.y(),targetQuat.z(),targetQuat.w()};
-    n.setParam("/initialQuat", parameter_quat);
+    nh.setParam("/initialQuat", parameter_quat);
 
     Eigen::Matrix3d rotationMatrix = targetQuat.toRotationMatrix();
     Eigen::Vector3d firstPosEigen(firstPos[0],firstPos[1],firstPos[2]);
@@ -360,8 +361,8 @@ void PathPlanner::set_strategique_position(ros::NodeHandle& n){
     for (int i = 0; i < parameter_pos3f.size(); ++i) {
         parameter_pos.push_back(static_cast<double>(parameter_pos3f[i]));
     }
-    n.setParam("/initialPos", parameter_pos);
-    n.setParam("/finalPos", parameter_pos);
+    nh.setParam("/initialPos", parameter_pos);
+    nh.setParam("/finalPos", parameter_pos);
 }
  // server has a service to convert StripingPlan to Path, but all it does it call this method
 bool PathPlanner::convertStripingPlanToPath(const boustrophedon_msgs::StripingPlan& striping_plan, nav_msgs::Path& path)
